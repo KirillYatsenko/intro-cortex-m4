@@ -1,0 +1,8 @@
+*.o
+*.axf
+*.bin
+*.map
+*.d
+*.lst
+.cache/
+compile_commands.json
