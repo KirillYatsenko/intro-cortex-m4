@@ -1,6 +1,6 @@
 # ToDo
 
-1. Change UART port in examples/uart. Test using ftdi cable
+1. Change UART port in examples/uart. Test using ftdi cable - DONE
 2. Refine blink example using systick interrupt instead of polling
 3. Improve UART driver using interrupts instead of polling
 4. Implement printf functionality for debugging purposes
