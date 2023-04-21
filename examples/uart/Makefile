@@ -1,6 +1,6 @@
 PART    ?= TM4C123GH6PM
 TARGET  ?= TM4C123_RB1
-CFLAGS  ?= -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -ffunction-sections -fdata-sections -std=c99 -g -Os -Wall -Werror -Iinc
+CFLAGS  ?= -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -ffunction-sections -fdata-sections -std=c99 -g -Os -Wall -Werror -I../../inc
 LDFLAGS ?= --gc-sections
 
 LIBGCC  := ${shell arm-none-eabi-gcc ${CFLAGS} -print-libgcc-file-name}
