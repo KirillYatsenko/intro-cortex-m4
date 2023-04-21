@@ -63,22 +63,42 @@ void uart_init(void)
 	GPIO_PORTA_DEN_R |= 0x03; // enable digital I/O on PA1-0
 }
 
+char uart_inchar(void)
+{
+	while ((UART0_FR_R & 0x10) != 0); // wait until RXFE is 0
+	return ((char)(UART0_DR_R & 0xFF));
+}
+
 void uart_outchar(char data)
 {
 	while ((UART0_FR_R & 0x20) != 0); // block until TXFF is 0
 	UART0_DR_R = data;
 }
 
-// Output 'A' every second
+void uart_out_string(char *str)
+{
+	if (!str)
+		return;
+
+	while (*str != '\0' )
+		uart_outchar(*(str++));
+}
+
 int main(void)
 {
+	char c;
+
 	pll_init_80mhz();
 	systick_init();
 	uart_init();
 
+	// Echo input
 	while (true) {
 		systick_wait_10ms(100); // 100 * 10ms = 1s
-		uart_outchar('A');
+
+		c = uart_inchar();
+		uart_out_string("You typed:");
+		uart_outchar(c);
 	}
 }
 
