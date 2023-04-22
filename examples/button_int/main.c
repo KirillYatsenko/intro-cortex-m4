@@ -2,42 +2,53 @@
 #include <stdbool.h>
 #include "tm4c123gh6pm.h"
 
-#define PF2 (*((volatile uint32_t *)0x40025010))
+#define PF2_3 (*((volatile uint32_t *)0x40025030))
+#define UNLOCK_PORT_VAL 0x4C4F434B // page #684 in datasheet
 
 extern void EnableInterrupts(void);
 
-// BLUE LED - PF2
-void led_init(void)
+// PF2 pin - blue
+// PF3 pin - green
+void leds_init(void)
 {
 	SYSCTL_RCGCGPIO_R |= 0x20; // Enable clock to Port F
 	while ((SYSCTL_RCGCGPIO_R & 0x20) == 0);
 
-	GPIO_PORTF_DIR_R |= 0x04;
-	GPIO_PORTF_DEN_R |= 0x04;
+	GPIO_PORTF_DIR_R |= 0x0C;
+	GPIO_PORTF_DEN_R |= 0x0C;
 }
 
-void led_toggle(void)
+void led_toggle_blue(void)
 {
-	PF2 = PF2 ^ 0x04;
+	PF2_3 = PF2_3 ^ 0x04;
+}
+
+void led_toggle_green(void)
+{
+	PF2_3 = PF2_3 ^ 0x08;
 }
 
 // SW1 - PF4
-void button_init(void)
+// SW2 - PF0
+void buttons_init(void)
 {
 	SYSCTL_RCGCGPIO_R |= 0x20; // activate clock for port F
 	while ((SYSCTL_RCGCGPIO_R & 0x20) == 0);
 
-	GPIO_PORTF_DIR_R &= ~0x10; // make PF4 in (build-in button)
-	GPIO_PORTF_AFSEL_R &= ~0x10; // disable alt func
-	GPIO_PORTF_DEN_R |= 0x10; // enable digital IO
-	GPIO_PORTF_PCTL_R &= ~0x000F0000; // configure PF4 as GPIO
-	GPIO_PORTF_AMSEL_R &= ~0x10; // disable analog functionality
-	GPIO_PORTF_PUR_R |= 0x10; // enable weak pull up on PF4
-	GPIO_PORTF_IS_R &= ~0x10; // configure as edge sensitive
-	GPIO_PORTF_IBE_R &= ~0x10; // is not both edged
-	GPIO_PORTF_IEV_R &= ~0x10; // falling edge
-	GPIO_PORTF_ICR_R = 0x10; // clear interrupt flag
-	GPIO_PORTF_IM_R |= 0x10; // arm the interrupt
+	GPIO_PORTF_LOCK_R = UNLOCK_PORT_VAL; // unlock GPIOCR register
+	GPIO_PORTF_CR_R = 0xFF; // enable commit register for all bits in PORT F
+
+	GPIO_PORTF_DIR_R &= ~0x11; // make PF4 & PF0 in (build-in button)
+	GPIO_PORTF_AFSEL_R &= ~0x11; // disable alt func
+	GPIO_PORTF_DEN_R |= 0x11; // enable digital IO
+	GPIO_PORTF_PCTL_R &= ~0x000F000F; // configure PF4 & PF0 as GPIO
+	GPIO_PORTF_AMSEL_R &= ~0x11; // disable analog functionality
+	GPIO_PORTF_PUR_R |= 0x11; // enable weak pull up on PF4
+	GPIO_PORTF_IS_R &= ~0x11; // configure as edge sensitive
+	GPIO_PORTF_IBE_R &= ~0x11; // is not both edged
+	GPIO_PORTF_IEV_R &= ~0x11; // falling edge
+	GPIO_PORTF_ICR_R = 0x11; // clear interrupt flag
+	GPIO_PORTF_IM_R |= 0x11; // arm the interrupt
 	NVIC_PRI7_R = (NVIC_PRI7_R & 0xFF00FFFF) | 0x00A00000; // priority 5
 	NVIC_EN0_R = 0x40000000; // enable interrupt 30 in NVIC
 
@@ -46,14 +57,23 @@ void button_init(void)
 
 void GpioPortFhandler(void)
 {
-	GPIO_PORTF_ICR_R = 0x10;
-	led_toggle();
+	if (GPIO_PORTF_RIS_R & 0x10) {
+		// SW1 - PF4 pressed
+		GPIO_PORTF_ICR_R |= 0x10;
+		led_toggle_blue();
+	} else if (GPIO_PORTF_RIS_R & 0x01) {
+		// SW2 - PF0 pressed
+		GPIO_PORTF_ICR_R |= 0x01;
+		led_toggle_green();
+	} else {
+		// error: who the hell triggered the interrupt?
+	}
 }
 
 int main(void)
 {
-	led_init();
-	button_init();
+	leds_init();
+	buttons_init();
 
 	while (true) {
 	}
