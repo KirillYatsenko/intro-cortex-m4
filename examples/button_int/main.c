@@ -7,6 +7,9 @@
 
 extern void EnableInterrupts(void);
 
+void button_int_arm(void);
+void button_int_disarm(void);
+
 // PF2 pin - blue
 // PF3 pin - green
 void leds_init(void)
@@ -26,6 +29,51 @@ void led_toggle_blue(void)
 void led_toggle_green(void)
 {
 	PF2_3 = PF2_3 ^ 0x08;
+}
+
+void timer_arm()
+{
+	TIMER0_ICR_R = 0x01; // clear timer0 timeout flag
+	TIMER0_IMR_R |= 0x01; // enable timeout interrupt
+	TIMER0_CTL_R |= 0x01; // enable timer
+}
+
+void timer_disarm()
+{
+	TIMER0_IMR_R &= ~0x01; // mask timeout interrupt
+}
+
+// expects 16MHz clock
+void timer_init()
+{
+	SYSCTL_RCGCTIMER_R |= 0x01; // enable timer0 clock
+	while ((SYSCTL_RCGCTIMER_R & 0x01) == 0);
+
+	TIMER0_CTL_R = 0; // disable the timer
+	TIMER0_CFG_R = 0; // configure for 32-bit mode
+
+	TIMER0_TAMR_R = 0x01; // one shot mode
+	TIMER0_TAILR_R = (200 * 1000 * 16) - 1;  // reload value - 200ms
+	TIMER0_ICR_R = 0x01; // clear timer0 timeout flag
+	NVIC_PRI4_R = (NVIC_PRI4_R & 0x0FFFFFFF) | 0x40000000; // priority 2 (why it's 2 and not 4)?
+	NVIC_EN0_R |= 0x80000; // enable irq 19
+}
+
+void Timer0A_Handler(void)
+{
+	timer_disarm();
+	button_int_arm();
+}
+
+void button_int_arm(void)
+{
+	GPIO_PORTF_ICR_R = 0x11; // clear interrupt flag
+	GPIO_PORTF_IM_R |= 0x11;
+}
+
+void button_int_disarm(void)
+{
+	GPIO_PORTF_IM_R &= ~0x11;
 }
 
 // SW1 - PF4
@@ -48,7 +96,7 @@ void buttons_init(void)
 	GPIO_PORTF_IBE_R &= ~0x11; // is not both edged
 	GPIO_PORTF_IEV_R &= ~0x11; // falling edge
 	GPIO_PORTF_ICR_R = 0x11; // clear interrupt flag
-	GPIO_PORTF_IM_R |= 0x11; // arm the interrupt
+	button_int_arm();
 	NVIC_PRI7_R = (NVIC_PRI7_R & 0xFF00FFFF) | 0x00A00000; // priority 5
 	NVIC_EN0_R = 0x40000000; // enable interrupt 30 in NVIC
 
@@ -57,24 +105,27 @@ void buttons_init(void)
 
 void GpioPortFhandler(void)
 {
-	if (GPIO_PORTF_RIS_R & 0x10) {
-		// SW1 - PF4 pressed
+	button_int_disarm();
+
+	if (GPIO_PORTF_RIS_R & 0x10) { // SW1 - PF4 pressed
 		GPIO_PORTF_ICR_R |= 0x10;
 		led_toggle_blue();
-	} else if (GPIO_PORTF_RIS_R & 0x01) {
-		// SW2 - PF0 pressed
+	} else if (GPIO_PORTF_RIS_R & 0x01) { // SW2 - PF0 pressed
 		GPIO_PORTF_ICR_R |= 0x01;
 		led_toggle_green();
 	} else {
 		// error: who the hell triggered the interrupt?
 	}
+
+	timer_arm(); // arm one shot timer
 }
 
 int main(void)
 {
 	leds_init();
+	timer_init();
 	buttons_init();
 
-	while (true) {
-	}
+	EnableInterrupts();
+	while (true);
 }
