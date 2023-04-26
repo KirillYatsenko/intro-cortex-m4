@@ -2,7 +2,7 @@
 
 - Change UART port in examples/uart. Test using ftdi cable - DONE
 - Refine blink example using systick interrupt instead of polling - DONE
-- Improve UART driver using interrupts instead of polling
+- Improve UART driver using interrupts instead of polling, add FIFO buffering
 - Implement printf functionality for debugging purposes
 - Matrix keyboard driver
 - SPI nokia 5110 lcd driver
@@ -13,4 +13,4 @@
 - Implement button edge triggering interrupt service, debouncing. - DONE
 - Create an alarm clock which will be powered from powerbank using nokia 5110
   and a few buttons
-- Interface temperature/humidity sensor, show measurments on the LCD
+- Interface temperature/humidity sensor with I2C, show measurments on the LCD
