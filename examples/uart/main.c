@@ -1,66 +1,36 @@
 #include <stdint.h>
 #include <stdbool.h>
+
 #include "pll.h"
+#include "systick.h"
 #include "tm4c123gh6pm.h"
 
-#define SYSDIV2 4
-#define PF2 (*((volatile uint32_t *)0x40025010))
-
-void systick_wait(uint32_t delay)
-{
-	NVIC_ST_RELOAD_R = delay - 1;
-	NVIC_ST_CURRENT_R = 0; // any value written to CURRENT clears
-	while ((NVIC_ST_CTRL_R & 0x10000) == 0); // waits for COUNT flag
-}
-
-void systick_wait_10ms(uint32_t delay)
-{
-	uint32_t i;
-	for (i = 0; i < delay; i++) {
-		/* expects 80MHz source clock
-		 * 1/80Mhz = 12.5 ns
-		 * 12.5ns * 800000 = 10ms
-		 */
-		systick_wait(800000); // wait 10ms
-	}
-}
-
-void systick_init(void)
-{
-	NVIC_ST_CTRL_R = 0; // disable systick
-	NVIC_ST_RELOAD_R = 0x00FFFFFF; // maximum reload value 2^24
-	NVIC_ST_CURRENT_R = 0; // any write to current will clear it
-	NVIC_ST_CTRL_R = 0x05; // enable systick with core clock
-}
-
-// UART3 is enabled
-// Rx - PC6
-// Tx - PC7
+// UART0 - microusb port
 void uart_init(void)
 {
-	SYSCTL_RCGCUART_R |= 0x08; // activate UART3
-	SYSCTL_RCGCGPIO_R |= 0x04; // activate PORT C
-	UART3_CTL_R &= ~0x01; // diable UART
-	UART3_IBRD_R = 43; // baudrate = 115200, see page #896 in datasheet
-	UART3_FBRD_R = 26;
-	UART3_LCRH_R = 0x70; // 8-bit word length, enable FIFO
-	UART3_CTL_R = 0x301; // enable RXE, TXE and UART
-	GPIO_PORTC_PCTL_R = (GPIO_PORTC_PCTL_R & 0x00FFFFFF) | 0x11000000; // UART
-	GPIO_PORTC_AMSEL_R &= ~0xC0; // disable analog function on PC7-6
-	GPIO_PORTC_AFSEL_R |= 0xC0; // enable alt function on PC7-6
-	GPIO_PORTC_DEN_R |= 0xC0; // enable digital I/O on PC7-6
+       SYSCTL_RCGCUART_R |= 0x01; // activate UART0
+       SYSCTL_RCGCGPIO_R |= 0x01; // activate PORT A
+       UART0_CTL_R &= ~0x01; // diable UART
+       UART0_IBRD_R = 43; // baudrate = 115200, see page #896 in datasheet
+       UART0_FBRD_R = 26;
+       UART0_LCRH_R = 0x70; // 8-bit word length, enable FIFO
+       UART0_CTL_R = 0x301; // enable RXE, TXE and UART
+       GPIO_PORTA_PCTL_R = (GPIO_PORTA_PCTL_R & 0xFFFFFF00) + 0x11; // UART
+       GPIO_PORTA_AMSEL_R &= ~0x03; // disable analog function on PA1-0
+       GPIO_PORTA_AFSEL_R |= 0x03; // enable alt function on PA1-0
+       GPIO_PORTA_DEN_R |= 0x03; // enable digital I/O on PA1-0
 }
 
 char uart_inchar(void)
 {
-	while ((UART3_FR_R & 0x10) != 0); // wait until RXFE is 0
-	return ((char)(UART3_DR_R & 0xFF));
+	while ((UART0_FR_R & 0x10) != 0); // wait until RXFE is 0
+	return ((char)(UART0_DR_R & 0xFF));
 }
 
 void uart_outchar(char data)
 {
-	while ((UART3_FR_R & 0x20) != 0); // block until TXFF is 0
-	UART3_DR_R = data;
+	while ((UART0_FR_R & 0x20) != 0); // block until TXFF is 0
+	UART0_DR_R = data;
 }
 
 void uart_out_string(char *str)
