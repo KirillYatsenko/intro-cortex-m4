@@ -21,13 +21,11 @@ static char tx_rg_buf_mem[BUF_SIZE];
 
 static void uart_enable_rx_irq(void)
 {
-	UART0_ICR_R = UART_ICR_RXIC | UART_ICR_RTIC; // clear Rx/timeout interrupt
 	UART0_IM_R |= UART_IM_RXIM | UART_IM_RTIM;
 }
 
 static void uart_enable_tx_irq(void)
 {
-	UART0_ICR_R = UART_ICR_TXIC; // clear Tx interrupt
 	UART0_IM_R |= UART_IM_TXIM;
 }
 
@@ -69,7 +67,10 @@ void uart_init(void)
 	rg_buf_init(&rx_rg_buf, &rx_buf_attr);
 	rg_buf_init(&tx_rg_buf, &tx_buf_attr);
 
+	UART0_ICR_R = UART_ICR_RXIC | UART_ICR_RTIC; // clear Rx/timeout interrupt
 	uart_enable_rx_irq();
+
+	UART0_ICR_R = UART_ICR_TXIC; // clear Tx interrupt
 	uart_enable_tx_irq();
 }
 
