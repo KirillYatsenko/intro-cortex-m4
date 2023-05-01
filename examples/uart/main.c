@@ -26,8 +26,12 @@ int main(void)
 	uart_init();
 	systick_init();
 
+	uart_put_str(str);
+
 	while (true) {
-		uart_put_str(str);
-		systick_wait_10ms(100);
+		char c;
+
+		if(!uart_get_char(&c))
+			uart_put_char(c);
 	}
 }
