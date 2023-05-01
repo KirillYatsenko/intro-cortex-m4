@@ -101,17 +101,7 @@ void UART0_IntHandler(void)
 	}
 }
 
-int uart_put_char_poll(char c)
-{
-	// wait until hw buffer can receive data
-	while ((UART0_FR_R & UART_FR_TXFF) != 0);
-
-	UART0_DR_R = c;
-
-	return 0;
-}
-
-int uart_put_char(char c)
+void _putchar(char c)
 {
 	bool tx_running;
 
@@ -128,20 +118,8 @@ int uart_put_char(char c)
 
 	uart_enable_tx_irq();
 
-	return 0;
-}
-
-void uart_put_str(char *str)
-{
-	if (!str)
-		return;
-
-	while (*str != '\0' ) {
-		if (*str == '\n')
-			uart_put_char('\r');
-
-		uart_put_char(*(str++));
-	}
+	if (c == '\n')
+		_putchar('\r');
 }
 
 int uart_get_char(char *c)

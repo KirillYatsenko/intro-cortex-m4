@@ -3,9 +3,7 @@
 
 // expects main clock to be set to 80MHz
 void uart_init(void);
-int uart_put_char(char);
-int uart_put_char_poll(char c);
-void uart_put_str(char *str);
+void _putchar(char); // used by printf lib
 int uart_get_char(char *);
 
 #endif

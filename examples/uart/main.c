@@ -6,6 +6,7 @@
 #include "pll.h"
 #include "systick.h"
 #include "tm4c123gh6pm.h"
+#include "printf.h"
 
 // Too big to be on the stack
 static char str[] = "Beyond the horizon of the place we lived when we were young\n" \
@@ -26,12 +27,12 @@ int main(void)
 	uart_init();
 	systick_init();
 
-	uart_put_str(str);
+	printf("%s\n", str);
 
 	while (true) {
 		char c;
 
-		if(!uart_get_char(&c))
-			uart_put_char(c);
+		if (!uart_get_char(&c))
+			printf("%c", c);
 	}
 }

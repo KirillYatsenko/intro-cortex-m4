@@ -2,7 +2,7 @@ PART    ?= TM4C123GH6PM
 TARGET  ?= TM4C123_RB1
 CFLAGS  ?= -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=softfp \
 	   -ffunction-sections -fdata-sections -std=c99 -Os -Wall -Werror \
-	   -I../../inc -I../../drivers
+	   -I../../inc -I../../drivers -DPRINTF_INCLUDE_CONFIG_H
 
 LDFLAGS ?= --gc-sections
 
