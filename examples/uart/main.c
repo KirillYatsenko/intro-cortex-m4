@@ -28,6 +28,7 @@ int main(void)
 	systick_init();
 
 	printf("%s\n", str);
+	printf("This is: %s on line: %d\n", __FILE__, __LINE__);
 
 	while (true) {
 		char c;
