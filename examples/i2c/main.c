@@ -12,7 +12,7 @@
 #define I2C_CLK 100000 // 100 KHz
 #define AHT20_I2C_ADDR 0x38
 
-// i2c module #0: PA6(SCL) - PA7(SDA) pins
+// i2c module #1: PA6(SCL) - PA7(SDA) pins
 void i2c_init()
 {
 	SYSCTL_RCGCI2C_R |= SYSCTL_RCGCI2C_R1; // enable clock to i2c module #1
@@ -27,46 +27,63 @@ void i2c_init()
 	I2C1_MTPR_R = (CLOCK_SPEED / (20 * I2C_CLK)) - 1; // configure SCL timer period
 }
 
-// transmit one byte
-int i2c_transmit(uint8_t addr, uint8_t val)
+int i2c_transmit(uint8_t addr, uint8_t *val, size_t size)
 {
-	I2C1_MSA_R = (AHT20_I2C_ADDR << 1); // write to slave
+	size_t i;
+	volatile uint32_t readback;
 
-	I2C1_MDR_R = val;
-	I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_STOP; // one byte write
+	I2C1_MSA_R = (addr << 1);
 
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSBSY);
+	for (i = 0; i < size; i++) {
+		I2C1_MDR_R = val[i];
 
-	if (I2C1_MCS_R & I2C_MCS_ADRACK)
-		printf("adr wasn't ack\n");
+		if (i == 0) {
+			if (size == 0)
+				I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_STOP;
+			else
+				I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN;
+		} else if (i == size - 1) {
+			I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_STOP;
+		} else {
+			I2C1_MCS_R = I2C_MCS_RUN;
+		}
 
-	if (I2C1_MCS_R & I2C_MCS_DATACK)
-		printf("data wasn't ack\n");
+		// ensure the write buffer is drained before checking BUSY flag
+		readback = I2C1_MCS_R;
+		while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	}
 
 	return I2C1_MCS_R & I2C_MCS_ERROR;
 }
 
 // read one byte
-int i2c_receive(uint8_t addr, uint8_t *val)
+// uint8_t i2c_receive(uint8_t addr, uint8_t *val)
+// {
+// 	I2C1_MSA_R = (addr << 1) | 0x01; // read from slave
+// 	I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_ACK; // send slave addr
+// 
+// 	// wait until the transfer is done
+// 	while (I2C1_MCS_R & I2C_MCS_BUSY){}
+// 
+// 	*val = I2C1_MDR_R;
+// 
+// 	return I2C1_MCS_R & I2C_MCS_ERROR;
+// }
+
+int i2c_receive(uint8_t addr, uint8_t *val, size_t size)
 {
-	if (!val)
-		return -1;
+	volatile uint32_t readback;
 
-	while (I2C1_MCS_R & I2C_MCS_BUSY);
+	I2C1_MSA_R = (addr << 1) | 0x01; // read from slave
+	I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_ACK; // send slave addr
 
-	I2C1_MSA_R = (AHT20_I2C_ADDR << 1) | 0x01; // read from slave
-	I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_ACK | I2C_MCS_STOP; // send slave addr
+	// ensure the write buffer is drained before checking BUSY flag
+	readback = I2C1_MCS_R;
 
 	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSBSY)
-		leds_blue_on();
-
-	leds_blue_off();
+	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
 
 	*val = I2C1_MDR_R;
-	if (*val)
-		leds_green_on();
 
 	return I2C1_MCS_R & I2C_MCS_ERROR;
 }
@@ -74,6 +91,8 @@ int i2c_receive(uint8_t addr, uint8_t *val)
 int main(void)
 {
 	int rc;
+	uint8_t val_tx[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+	uint8_t rx_tx[2];
 
 	leds_init_builtin();
 	pll_init_80mhz();
@@ -81,11 +100,13 @@ int main(void)
 	systick_init();
 	i2c_init();
 
-	printf("\n\n%s: %d", "This is i2c driver!", 2);
+	printf("This is i2c driver!\n");
 	systick_wait_10ms(100);
 
+
 	while (true) {
-		rc = i2c_transmit(AHT20_I2C_ADDR, 0x11);
+		printf("sizeof: %d\n", sizeof(val_tx));
+		rc = i2c_transmit(AHT20_I2C_ADDR, val_tx, sizeof(val_tx));
 		if (rc)
 			printf("Error during i2c_transmit\n");
 		else
@@ -95,9 +116,9 @@ int main(void)
 // 		if (rc)
 // 			printf("Error during i2c_receive\n");
 // 		else
-// 			printf("Success i2c_receive: 0%x\n", val);
+// 			printf("Success i2c_receive: 0%b\n", val);
 
 
-		systick_wait_10ms(100);
+		systick_wait_10ms(10);
 	}
 }
