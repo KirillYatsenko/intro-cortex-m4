@@ -33,3 +33,13 @@ void leds_blue_toggle(void)
 {
 	PF2_3 = PF2_3 ^ 0x04;
 }
+
+void leds_blue_on(void)
+{
+	PF2_3 = PF2_3 | 0x04;
+}
+
+void leds_blue_off(void)
+{
+	PF2_3 = PF2_3 & ~0x04;
+}
