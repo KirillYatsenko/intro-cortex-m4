@@ -32,6 +32,9 @@ int i2c_transmit(uint8_t addr, uint8_t *val, size_t size)
 	size_t i;
 	volatile uint32_t readback;
 
+	if (!val)
+		return -1;
+
 	I2C1_MSA_R = (addr << 1);
 
 	for (i = 0; i < size; i++) {
@@ -56,74 +59,32 @@ int i2c_transmit(uint8_t addr, uint8_t *val, size_t size)
 	return I2C1_MCS_R & I2C_MCS_ERROR;
 }
 
-// read one byte
-// uint8_t i2c_receive(uint8_t addr, uint8_t *val)
-// {
-// 	I2C1_MSA_R = (addr << 1) | 0x01; // read from slave
-// 	I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_ACK; // send slave addr
-// 
-// 	// wait until the transfer is done
-// 	while (I2C1_MCS_R & I2C_MCS_BUSY){}
-// 
-// 	*val = I2C1_MDR_R;
-// 
-// 	return I2C1_MCS_R & I2C_MCS_ERROR;
-// }
-
 int i2c_receive(uint8_t addr, uint8_t *val, size_t size)
 {
+	size_t i;
 	volatile uint32_t readback;
 
-	I2C1_MSA_R = (addr << 1) | 0x01; // read from slave
-	I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_ACK; // send slave addr
+	if (!val)
+		return -1;
 
-	// ensure the write buffer is drained before checking BUSY flag
-	readback = I2C1_MCS_R;
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
-	val[0] = I2C1_MDR_R;
+	I2C1_MSA_R = (addr << 1) | I2C_MSA_RS; // read from slave
 
-	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
-	// ensure the write buffer is drained before checking BUSY flag
-	readback = I2C1_MCS_R;
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
-	val[1] = I2C1_MDR_R;
+	for (i = 0; i < size; i++) {
+		if (i == 0)
+			I2C1_MCS_R = I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_ACK;
+		else if (i == size - 1)
+			I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_STOP;
+		else
+			I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
 
-	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
-	// ensure the write buffer is drained before checking BUSY flag
-	readback = I2C1_MCS_R;
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
-	val[2] = I2C1_MDR_R;
+		// ensure the write buffer is drained before checking BUSY flag
+		readback = I2C1_MCS_R;
 
-	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
-	// ensure the write buffer is drained before checking BUSY flag
-	readback = I2C1_MCS_R;
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
-	val[3] = I2C1_MDR_R;
+		// wait until the transfer is done
+		while (I2C1_MCS_R & I2C_MCS_BUSY) {};
 
-	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
-	// ensure the write buffer is drained before checking BUSY flag
-	readback = I2C1_MCS_R;
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
-	val[4] = I2C1_MDR_R;
-
-	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
-	// ensure the write buffer is drained before checking BUSY flag
-	readback = I2C1_MCS_R;
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
-	val[5] = I2C1_MDR_R;
-
-	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_STOP;
-	// ensure the write buffer is drained before checking BUSY flag
-	readback = I2C1_MCS_R;
-	// wait until the transfer is done
-	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
-	val[6] = I2C1_MDR_R;
+		val[i] = I2C1_MDR_R;
+	}
 
 	return I2C1_MCS_R & I2C_MCS_ERROR;
 }
@@ -170,12 +131,12 @@ int aht20_measure(void)
 	return rc;
 }
 
-int aht20_read_sensors(uint8_t *sensor_data, size_t size)
+int aht20_read_sensor(uint8_t *sensor_data, size_t size)
 {
 	if (!sensor_data || size < 7)
 		return -1;
 
-	return i2c_receive(AHT20_I2C_ADDR, sensor_data, sizeof(sensor_data));
+	return i2c_receive(AHT20_I2C_ADDR, sensor_data, size);
 }
 
 int aht20_calculate(uint8_t *sensor_data, size_t size)
@@ -238,7 +199,7 @@ int main(void)
 			goto next;
 		}
 
-		rc = aht20_read_sensors(sensor_data, sizeof(sensor_data));
+		rc = aht20_read_sensor(sensor_data, sizeof(sensor_data));
 		if (rc) {
 			printf("Error during reading sensor data from aht20\n");
 			goto next;
