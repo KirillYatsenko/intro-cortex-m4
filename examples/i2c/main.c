@@ -79,20 +79,136 @@ int i2c_receive(uint8_t addr, uint8_t *val, size_t size)
 
 	// ensure the write buffer is drained before checking BUSY flag
 	readback = I2C1_MCS_R;
-
 	// wait until the transfer is done
 	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	val[0] = I2C1_MDR_R;
 
-	*val = I2C1_MDR_R;
+	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
+	// ensure the write buffer is drained before checking BUSY flag
+	readback = I2C1_MCS_R;
+	// wait until the transfer is done
+	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	val[1] = I2C1_MDR_R;
+
+	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
+	// ensure the write buffer is drained before checking BUSY flag
+	readback = I2C1_MCS_R;
+	// wait until the transfer is done
+	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	val[2] = I2C1_MDR_R;
+
+	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
+	// ensure the write buffer is drained before checking BUSY flag
+	readback = I2C1_MCS_R;
+	// wait until the transfer is done
+	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	val[3] = I2C1_MDR_R;
+
+	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
+	// ensure the write buffer is drained before checking BUSY flag
+	readback = I2C1_MCS_R;
+	// wait until the transfer is done
+	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	val[4] = I2C1_MDR_R;
+
+	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_ACK;
+	// ensure the write buffer is drained before checking BUSY flag
+	readback = I2C1_MCS_R;
+	// wait until the transfer is done
+	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	val[5] = I2C1_MDR_R;
+
+	I2C1_MCS_R = I2C_MCS_RUN | I2C_MCS_STOP;
+	// ensure the write buffer is drained before checking BUSY flag
+	readback = I2C1_MCS_R;
+	// wait until the transfer is done
+	while (I2C1_MCS_R & I2C_MCS_BUSY) {};
+	val[6] = I2C1_MDR_R;
 
 	return I2C1_MCS_R & I2C_MCS_ERROR;
+}
+
+int aht20_softreset(void)
+{
+	int rc;
+	uint8_t cmd[] = {0xBA};
+
+	rc = i2c_transmit(AHT20_I2C_ADDR, cmd, sizeof(cmd));
+	if (rc)
+		return rc;
+
+	systick_wait_10ms(2);
+
+	return rc;
+}
+
+int aht20_init(void)
+{
+	int rc;
+	uint8_t cmd[] = {0xBE, 0x08, 0x00};
+
+	rc = i2c_transmit(AHT20_I2C_ADDR, cmd, sizeof(cmd));
+	if (rc)
+		return rc;
+
+	systick_wait_10ms(1);
+
+	return rc;
+}
+
+int aht20_measure(void)
+{
+	int rc;
+	uint8_t cmd[] = {0xAC, 0x33, 0x00};
+
+	rc = i2c_transmit(AHT20_I2C_ADDR, cmd, sizeof(cmd));
+	if (rc)
+		return rc;
+
+	systick_wait_10ms(8);
+
+	return rc;
+}
+
+int aht20_read_sensors(uint8_t *sensor_data, size_t size)
+{
+	if (!sensor_data || size < 7)
+		return -1;
+
+	return i2c_receive(AHT20_I2C_ADDR, sensor_data, sizeof(sensor_data));
+}
+
+int aht20_calculate(uint8_t *sensor_data, size_t size)
+{
+	float temp, hum;
+	uint32_t traw, hraw;
+
+	if (!sensor_data || size < 7)
+		return -1;
+
+	traw = sensor_data[3] & 0x0F;
+	traw <<= 8;
+	traw |= sensor_data[4];
+	traw <<= 8;
+	traw |= sensor_data[5];
+	temp = ((float)traw * 200 / 0x100000) - 50;
+
+	hraw = sensor_data[1];
+	hraw <<= 8;
+	hraw |= sensor_data[2];
+	hraw <<= 4;
+	hraw |= sensor_data[3] >> 4;
+	hum = ((float)hraw * 100) / 0x100000;
+
+	printf("temp is: %.1f°C; hum is: %.1f%%\n", temp, hum);
+
+	return 0;
 }
 
 int main(void)
 {
 	int rc;
-	uint8_t val_tx[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
-	uint8_t rx_tx[2];
+	uint8_t sensor_data[7];
 
 	leds_init_builtin();
 	pll_init_80mhz();
@@ -100,25 +216,43 @@ int main(void)
 	systick_init();
 	i2c_init();
 
-	printf("This is i2c driver!\n");
-	systick_wait_10ms(100);
+	printf("\n\nThis i2c driver for aht20 temperature-humidity sensor\n");
+	systick_wait_10ms(4); // give time for aht20 to power up
 
+	rc = aht20_softreset();
+	if (rc) {
+		printf("Error during aht20 soft reset\n");
+		goto exit;
+	}
+
+	rc = aht20_init();
+	if (rc) {
+		printf("Error during aht20 initialization\n");
+		goto exit;
+	}
 
 	while (true) {
-		printf("sizeof: %d\n", sizeof(val_tx));
-		rc = i2c_transmit(AHT20_I2C_ADDR, val_tx, sizeof(val_tx));
+		rc = aht20_measure();
+		if (rc) {
+			printf("Error during aht20 measurments\n");
+			goto next;
+		}
+
+		rc = aht20_read_sensors(sensor_data, sizeof(sensor_data));
+		if (rc) {
+			printf("Error during reading sensor data from aht20\n");
+			goto next;
+		}
+
+		rc = aht20_calculate(sensor_data, sizeof(sensor_data));
 		if (rc)
-			printf("Error during i2c_transmit\n");
-		else
-			printf("Success i2c_transmit\n");
+			printf("Error during aht20 sensor data calculation\n");
 
-// 		rc = i2c_receive(AHT20_I2C_ADDR, &val);
-// 		if (rc)
-// 			printf("Error during i2c_receive\n");
-// 		else
-// 			printf("Success i2c_receive: 0%b\n", val);
-
-
-		systick_wait_10ms(10);
+next:
+		// wait 2s before requesting values again
+		systick_wait_10ms(200);
 	}
+
+exit:
+	while(true) {};
 }
