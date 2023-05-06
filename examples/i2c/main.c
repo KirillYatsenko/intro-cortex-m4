@@ -7,6 +7,7 @@
 #include "systick.h"
 #include "tm4c123gh6pm.h"
 #include "printf.h"
+#include "crc8.h"
 
 #define CLOCK_SPEED 80000000 // 80 MHz
 #define I2C_CLK 100000 // 100 KHz
@@ -59,6 +60,7 @@ int i2c_transmit(uint8_t addr, uint8_t *val, size_t size)
 	return I2C1_MCS_R & I2C_MCS_ERROR;
 }
 
+// ToDo: the last byte is not ack
 int i2c_receive(uint8_t addr, uint8_t *val, size_t size)
 {
 	size_t i;
@@ -139,6 +141,12 @@ int aht20_read_sensor(uint8_t *sensor_data, size_t size)
 	return i2c_receive(AHT20_I2C_ADDR, sensor_data, size);
 }
 
+int crc_check(uint8_t *sensor_data, size_t size)
+{
+	uint8_t crc = crc8_calculate(0xFF, sensor_data, size - 1);
+	return crc != sensor_data[size - 1];
+}
+
 int aht20_calculate(uint8_t *sensor_data, size_t size)
 {
 	float temp, hum;
@@ -146,6 +154,11 @@ int aht20_calculate(uint8_t *sensor_data, size_t size)
 
 	if (!sensor_data || size < 7)
 		return -1;
+
+	if (crc_check(sensor_data, size)) {
+		printf("Crc check failed\n");
+		return -1;
+	}
 
 	traw = sensor_data[3] & 0x0F;
 	traw <<= 8;
@@ -161,7 +174,7 @@ int aht20_calculate(uint8_t *sensor_data, size_t size)
 	hraw |= sensor_data[3] >> 4;
 	hum = ((float)hraw * 100) / 0x100000;
 
-	printf("temp is: %.1f°C; hum is: %.1f%%\n", temp, hum);
+	printf("temperature: %.1f°C humidity: %.1f%%\n", temp, hum);
 
 	return 0;
 }
@@ -177,7 +190,10 @@ int main(void)
 	systick_init();
 	i2c_init();
 
-	printf("\n\nThis i2c driver for aht20 temperature-humidity sensor\n");
+	// CRC: CRC-8-Dallas/Maxim
+	crc8_init(0x31);
+
+	printf("\n\nThis is I2C driver for aht20 temperature-humidity sensor\n");
 	systick_wait_10ms(4); // give time for aht20 to power up
 
 	rc = aht20_softreset();
