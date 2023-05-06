@@ -13,5 +13,6 @@
 - Implement button edge triggering interrupt service, debouncing. - DONE
 - Create an alarm clock which will be powered from powerbank using nokia 5110
   and a few buttons
-- Write I2C driver by using only documentation
-- Interface temperature/humidity sensor with I2C, show measurments on the LCD
+- Write I2C driver by using only documentation - DONE
+- Interface temperature/humidity sensor with I2C - DONE
+- Show aht20 measurments on the LCD
