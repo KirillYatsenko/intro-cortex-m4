@@ -9,7 +9,6 @@
 - Move startup.c and scatter.ld to root directory
 - Move common driver code to common src folder
 - Implement Calculator using Matrix keyboard and 5110 nokia display
-- Think about calculus + embedded on arm cortex m
 - Implement button edge triggering interrupt service, debouncing. - DONE
 - Create an alarm clock which will be powered from powerbank using nokia 5110
   and a few buttons
