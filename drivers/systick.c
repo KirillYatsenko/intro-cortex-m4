@@ -8,6 +8,18 @@ static void systick_wait(uint32_t delay)
 	while ((NVIC_ST_CTRL_R & 0x10000) == 0); // waits for COUNT flag
 }
 
+void systick_wait_1ms(uint32_t delay)
+{
+	uint32_t i;
+	for (i = 0; i < delay; i++) {
+		/* expects 80MHz source clock
+		 * 1/80Mhz = 12.5 ns
+		 * 12.5ns * 80000 = 1ms
+		 */
+		systick_wait(80000); // wait 1ms
+	}
+}
+
 void systick_wait_10ms(uint32_t delay)
 {
 	uint32_t i;

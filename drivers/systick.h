@@ -5,6 +5,7 @@
 
 // expects 80MHz bus clock
 void systick_init(void);
+void systick_wait_1ms(uint32_t delay);
 void systick_wait_10ms(uint32_t delay);
 
 #endif
