@@ -51,7 +51,6 @@ int i2c_transmit(uint8_t addr, uint8_t *val, size_t size)
 	return I2C1_MCS_R & I2C_MCS_ERROR;
 }
 
-// ToDo: the last byte is not ack
 int i2c_receive(uint8_t addr, uint8_t *val, size_t size)
 {
 	size_t i;
