@@ -42,7 +42,7 @@ static void IntDefaultHandler(void);
 //
 //*****************************************************************************
 extern void UART0_IntHandler(void);
-
+extern void Timer0A_Handler(void);
 //*****************************************************************************
 //
 // The entry point for the application.
@@ -88,7 +88,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // GPIO Port C
     IntDefaultHandler,                      // GPIO Port D
     IntDefaultHandler,                      // GPIO Port E
-    UART0_IntHandler,                      // UART0 Rx and Tx
+    UART0_IntHandler,                       // UART0 Rx and Tx
     IntDefaultHandler,                      // UART1 Rx and Tx
     IntDefaultHandler,                      // SSI0 Rx and Tx
     IntDefaultHandler,                      // I2C0 Master and Slave
@@ -102,7 +102,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // ADC Sequence 2
     IntDefaultHandler,                      // ADC Sequence 3
     IntDefaultHandler,                      // Watchdog timer
-    IntDefaultHandler,                      // Timer 0 subtimer A
+    Timer0A_Handler,                        // Timer 0 subtimer A
     IntDefaultHandler,                      // Timer 0 subtimer B
     IntDefaultHandler,                      // Timer 1 subtimer A
     IntDefaultHandler,                      // Timer 1 subtimer B
@@ -346,4 +346,9 @@ IntDefaultHandler(void)
     while(1)
     {
     }
+}
+
+void EnableInterrupts(void)
+{
+    __asm("    CPSIE  I");
 }

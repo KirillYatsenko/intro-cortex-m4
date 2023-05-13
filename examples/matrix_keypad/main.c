@@ -23,6 +23,7 @@
 #define ROWS 4
 #define COLS 4
 
+extern void EnableInterrupts(void);
 static char matrix[] = "123A456B789C*0#D";
 
 void clocks_init(void)
@@ -71,6 +72,25 @@ void pins_init(void)
 	cols_init();
 }
 
+void timer_init(uint32_t period_us, uint8_t bus_fq_mhz)
+{
+	SYSCTL_RCGCTIMER_R |= 0x01; // enable timer0 clock
+	while ((SYSCTL_RCGCTIMER_R & 0x01) == 0);
+
+	TIMER0_CTL_R = 0; // disable the timer
+	TIMER0_CFG_R = 0; // configure for 32-bit mode
+
+	TIMER0_TAMR_R = 0x02; // periodic mode
+	TIMER0_TAILR_R = (period_us * bus_fq_mhz) - 1;  // reload value
+	TIMER0_ICR_R = 0x01; // clear timer0 timeout flag
+	TIMER0_IMR_R |= 0x01; // enable timeout interrupt
+	NVIC_PRI4_R = (NVIC_PRI4_R & 0x0FFFFFFF) | 0x40000000; // priority 2 (why it's 2 and not 4)?
+	NVIC_EN0_R |= 0x80000; // enable irq 19
+	TIMER0_CTL_R |= 0x01; // enable timer
+
+	EnableInterrupts();
+}
+
 // set row to output low
 void enable_row(uint8_t row)
 {
@@ -109,27 +129,31 @@ bool scan_col(uint8_t col)
 	return !(GPIO_PORTB_DATA_R & (1 << (1 - col % 2)));
 }
 
-void start_scanning(void)
+void Timer0A_Handler(void)
 {
 	uint8_t row = 0;
 	uint8_t col = 0;
 
-	while (true) {
-		enable_row(row % ROWS);
+	TIMER0_ICR_R = 0x01; // ack timeout irq
 
-		// refer to: https://youtu.be/GVEX90Buzi0?t=225
+	for (row = 0; row < ROWS; row++) {
+		enable_row(row);
+
+		/* we should wait here for 1ms because the output of the row may
+		 * not be stabilized by the time we read the col because of
+		 * capacitance of the circuit lines
+		 * refer to: https://youtu.be/GVEX90Buzi0?t=225
+		 */
 		systick_wait_1ms(1);
 
 		for (col = 0; col < COLS; col++) {
 			if (!scan_col(col))
 				continue;
 
-			printf("%c", matrix[(row % ROWS) * 4 + col]);
+			printf("%c", matrix[row * 4 + col]);
 		}
 
-		disable_row((row++) % ROWS);
-
-		systick_wait_10ms(1); // wait 10ms before scanning again
+		disable_row(row);
 	}
 }
 
@@ -141,8 +165,9 @@ int main(void)
 	systick_init();
 
 	pins_init();
+	timer_init(10000, 80); // start scanning keypad every 10ms
 
 	printf("\nThis is driver for matrix keypad\n");
 
-	start_scanning();
+	while (true);
 }
