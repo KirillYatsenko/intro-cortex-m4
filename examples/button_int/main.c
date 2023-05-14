@@ -55,7 +55,7 @@ void timer_init()
 	TIMER0_TAMR_R = 0x01; // one shot mode
 	TIMER0_TAILR_R = (200 * 1000 * 16) - 1;  // reload value - 200ms
 	TIMER0_ICR_R = 0x01; // clear timer0 timeout flag
-	NVIC_PRI4_R = (NVIC_PRI4_R & 0x0FFFFFFF) | 0x40000000; // priority 2 (why it's 2 and not 4)?
+	NVIC_PRI4_R = (NVIC_PRI4_R & 0x0FFFFFFF) | 0x40000000; // priority 2
 	NVIC_EN0_R |= 0x80000; // enable irq 19
 }
 
