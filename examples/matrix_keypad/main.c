@@ -1,3 +1,16 @@
+/*
+ * Video lecture by Valvano: https://youtu.be/GVEX90Buzi0
+ *
+ * The keypad diagram looks as follows:
+ *
+ * PA7—| 1 | 2 | 3 | A |
+ * PA6—| 4 | 5 | 6 | B |
+ * PA5—| 7 | 8 | 9 | C |
+ * PB4—| * | 0 | # | D |
+ *       |   |   |   |
+ *      PE5 PE4 PB1 PB0
+ */
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -7,18 +20,6 @@
 #include "systick.h"
 #include "tm4c123gh6pm.h"
 #include "printf.h"
-
-// Video lecture by Valvano: https://youtu.be/GVEX90Buzi0
-
-/* The keypad diagram looks as follows:
- *
- * PA7—| 1 | 2 | 3 | A |
- * PA6—| 4 | 5 | 6 | B |
- * PA5—| 7 | 8 | 9 | C |
- * PB4—| * | 0 | # | D |
- *       |   |   |   |
- *      PE5 PE4 PB1 PB0
- */
 
 #define ROWS 4
 #define COLS 4
