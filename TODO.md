@@ -4,7 +4,7 @@
 - Refine blink example using systick interrupt instead of polling - DONE
 - Improve UART driver using interrupts instead of polling, add FIFO buffering - DONE
 - Implement printf functionality for debugging purposes - DONE
-- Matrix keyboard driver
+- Matrix keyboard driver - DONE
 - SPI nokia 5110 lcd driver
 - Move startup.c and scatter.ld to root directory
 - Move common driver code to common src folder
