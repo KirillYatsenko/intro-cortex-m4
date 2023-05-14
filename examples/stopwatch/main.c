@@ -1,10 +1,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "systick.h"
 #include "uart.h"
 #include "pll.h"
 #include "tm4c123gh6pm.h"
 #include "printf.h"
+
+#define ESC 0x1B
 
 extern void EnableInterrupts(void);
 
@@ -73,6 +76,7 @@ int main(void)
 
 	pll_init_80mhz();
 	uart_init();
+	systick_init();
 	timer_init(1000 * 1, 80); // 1ms
 
 	while (true) {
@@ -85,7 +89,15 @@ int main(void)
 		tmp_hours = hours;
 		enable_timer_irq();
 
-		printf("%d:%d:%d:%d\n", tmp_hours, tmp_minutes,
+		// read: https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
+		printf("%c[2K", ESC); // clear the line
+		printf("%c[0G", ESC); // move cursor to the first column
+
+		printf("%d:%d:%d:%d", tmp_hours, tmp_minutes,
 		       tmp_seconds, tmp_mseconds);
+
+		// give user time to recognize the values before clearing the
+		// line, otherwise it would be too quick
+		systick_wait_10ms(2);
 	}
 }
