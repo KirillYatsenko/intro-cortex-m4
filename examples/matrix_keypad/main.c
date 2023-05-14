@@ -20,12 +20,17 @@
 #include "systick.h"
 #include "tm4c123gh6pm.h"
 #include "printf.h"
+#include "ring_buffer.h"
 
 #define ROWS 4
 #define COLS 4
+#define BUF_SIZE 8
 
 extern void EnableInterrupts(void);
 static char matrix[] = "123A456B789C*0#D";
+
+static struct rg_buf rg_buf;
+static char rg_buf_mem[BUF_SIZE];
 
 void clocks_init(void)
 {
@@ -147,6 +152,10 @@ void scan_keypad(void)
 	uint8_t row = 0;
 	uint8_t col = 0;
 
+	// ignore the char if there is no space for it
+	if (rg_buf_is_full(&rg_buf))
+		return;
+
 	disable_rows(ROWS);
 
 	for (row = 0; row < ROWS; row++) {
@@ -163,7 +172,7 @@ void scan_keypad(void)
 			if (!scan_col(col))
 				continue;
 
-			printf("%c", matrix[row * 4 + col]);
+			rg_buf_put_char(&rg_buf, matrix[row * COLS + col]);
 		}
 
 		disable_row(row);
@@ -186,14 +195,24 @@ void GpioPortE_Handler(void)
 
 int main(void)
 {
+	struct rg_buf_attr buf_attr = { rg_buf_mem, BUF_SIZE };
+
 	leds_init_builtin();
 	pll_init_80mhz();
 	uart_init();
 	systick_init();
+	rg_buf_init(&rg_buf, &buf_attr);
 
 	pins_init();
 
 	printf("\nThis is driver for matrix keypad\n");
 
-	while (true);
+	while (true) {
+		char c;
+
+		if (rg_buf_get_char(&rg_buf, &c))
+			continue;
+
+		printf("%c", c);
+	}
 }
