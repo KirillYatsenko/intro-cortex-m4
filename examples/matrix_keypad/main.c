@@ -38,15 +38,17 @@ void clocks_init(void)
 
 void rows_init(void)
 {
-	// Set all rows as HiZ(set the pin to the input mode)
-	GPIO_PORTA_DIR_R &= ~0xE0; // set PAT7-5 as input
-	GPIO_PORTB_DIR_R &= ~0x10; // set PB4 as input
+	GPIO_PORTA_DIR_R |= 0xE0; // set PA7-5 as output
+	GPIO_PORTB_DIR_R |= 0x10; // set PB4 as output
 
 	GPIO_PORTA_AFSEL_R &= ~0xE0; // disable PA7-5 alt functionality
 	GPIO_PORTB_AFSEL_R &= ~0x10; // disable PB4 alt functionality
 
 	GPIO_PORTA_DEN_R |= 0xE0; // enable digital signal on PA7-5
 	GPIO_PORTB_DEN_R |= 0x10; // enable digital signal on PB4
+
+	GPIO_PORTA_DATA_R |= ~0xE0; // set PA7-5 to low output
+	GPIO_PORTB_DATA_R |= ~0x10; // set PB4 to low output
 }
 
 void cols_init(void)
@@ -63,6 +65,18 @@ void cols_init(void)
 
 	GPIO_PORTE_DEN_R |= 0x30; // enable digital signal on PE5-4
 	GPIO_PORTB_DEN_R |= 0x03; // enable digital signal on PB1-0
+
+	// PORTB = interrupt #1, PORTE = interrupt #4
+	NVIC_PRI1_R = (NVIC_PRI1_R & ~NVIC_PRI0_INT0_M) | 0x800; // PORTE prio 4
+	NVIC_PRI0_R = (NVIC_PRI0_R & ~NVIC_PRI0_INT1_M) | 0x8000; // PORTB prio 4
+
+	NVIC_EN0_R |= 0x02 | 0x10; // enable irq 1 & 4
+
+	GPIO_PORTE_ICR_R = 0x03; // clear interrupt flags for PB1-0
+	GPIO_PORTB_ICR_R = 0x30; // clear interrupt flags for PB1-0
+
+	GPIO_PORTE_IM_R |= 0x30; // unmask interrupt for PE5-4 pins
+	GPIO_PORTB_IM_R |= 0x03; // unmask interrupt for PB1-0 pins
 }
 
 void pins_init(void)
@@ -70,25 +84,6 @@ void pins_init(void)
 	clocks_init();
 	rows_init();
 	cols_init();
-}
-
-void timer_init(uint32_t period_us, uint8_t bus_fq_mhz)
-{
-	SYSCTL_RCGCTIMER_R |= 0x01; // enable timer0 clock
-	while ((SYSCTL_RCGCTIMER_R & 0x01) == 0);
-
-	TIMER0_CTL_R = 0; // disable the timer
-	TIMER0_CFG_R = 0; // configure for 32-bit mode
-
-	TIMER0_TAMR_R = 0x02; // periodic mode
-	TIMER0_TAILR_R = (period_us * bus_fq_mhz) - 1;  // reload value
-	TIMER0_ICR_R = 0x01; // clear timer0 timeout flag
-	TIMER0_IMR_R |= 0x01; // enable timeout interrupt
-	NVIC_PRI4_R = (NVIC_PRI4_R & 0x0FFFFFFF) | 0x40000000; // priority 2 (why it's 2 and not 4)?
-	NVIC_EN0_R |= 0x80000; // enable irq 19
-	TIMER0_CTL_R |= 0x01; // enable timer
-
-	EnableInterrupts();
 }
 
 // set row to output low
@@ -105,6 +100,12 @@ void enable_row(uint8_t row)
 	}
 }
 
+void enable_rows(int8_t rows)
+{
+	while (rows >= 0)
+		enable_row(--rows);
+}
+
 // set row to input (HiZ output)
 void disable_row(uint8_t row)
 {
@@ -115,6 +116,12 @@ void disable_row(uint8_t row)
 		// PA7 = row #0, PA6 = row #1, PA5 = row #2
 		GPIO_PORTA_DIR_R &= ~(1 << (7 - row));
 	}
+}
+
+void disable_rows(int8_t rows)
+{
+	while (rows >= 0)
+		disable_row(--rows);
 }
 
 // return true if the given col is logical high(low voltage)
@@ -129,12 +136,17 @@ bool scan_col(uint8_t col)
 	return !(GPIO_PORTB_DATA_R & (1 << (1 - col % 2)));
 }
 
-void Timer0A_Handler(void)
+/*
+ * Disable the rows first, so we can determine which exactly row triggered the
+ * button press irq. Then scan all the rows one by one. Re-enable rows so the
+ * next interrupt can be handled.
+ */
+void scan_keypad(void)
 {
 	uint8_t row = 0;
 	uint8_t col = 0;
 
-	TIMER0_ICR_R = 0x01; // ack timeout irq
+	disable_rows(ROWS);
 
 	for (row = 0; row < ROWS; row++) {
 		enable_row(row);
@@ -155,6 +167,20 @@ void Timer0A_Handler(void)
 
 		disable_row(row);
 	}
+
+	enable_rows(ROWS);
+}
+
+void GpioPortB_Handler(void)
+{
+	scan_keypad();
+	GPIO_PORTB_ICR_R = 0x03; // clear PORTB interrupt status
+}
+
+void GpioPortE_Handler(void)
+{
+	scan_keypad();
+	GPIO_PORTE_ICR_R = 0x30; // clear PORTE interrupt status
 }
 
 int main(void)
@@ -165,7 +191,6 @@ int main(void)
 	systick_init();
 
 	pins_init();
-	timer_init(10000, 80); // start scanning keypad every 10ms
 
 	printf("\nThis is driver for matrix keypad\n");
 
