@@ -15,3 +15,5 @@
 - Write I2C driver by using only documentation - DONE
 - Interface temperature/humidity sensor with I2C - DONE
 - Show aht20 measurments on the LCD
+- Create stopwatch which has two buttons(stop and start). Should be using interrupts
+  for both buttons and timer interrupt. The resolution should be in mili seconds - DONE
