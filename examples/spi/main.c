@@ -6,31 +6,18 @@
 #include "pll.h"
 #include "tm4c123gh6pm.h"
 #include "printf.h"
+#include "ring_buffer.h"
+#include "leds.h"
 
 #define ESC			0x1B
 #define MAIN_CLK_FQ_MHZ		80
 #define SSI_CLK_FQ_MHZ		4
+#define RG_BUF_SIZE		128
+
+static struct rg_buf tx_rg_buf;
+static char tx_rg_buf_mem[RG_BUF_SIZE];
 
 extern void EnableInterrupts(void);
-
-void timer_init(uint32_t period_us, uint8_t bus_fq_mhz)
-{
-	SYSCTL_RCGCTIMER_R |= 0x01; // enable timer0 clock
-	while ((SYSCTL_RCGCTIMER_R & 0x01) == 0);
-
-	TIMER0_CTL_R = 0; // disable the timer
-	TIMER0_CFG_R = 0; // configure for 32-bit mode
-
-	TIMER0_TAMR_R = 0x02; // periodic mode
-	TIMER0_TAILR_R = (period_us * bus_fq_mhz) - 1;  // reload value
-	TIMER0_ICR_R = 0x01; // clear timer0 timeout flag
-	TIMER0_IMR_R |= 0x01; // enable timeout interrupt
-	NVIC_PRI4_R = (NVIC_PRI4_R & 0x0FFFFFFF) | 0x40000000; // priority 2
-	NVIC_EN0_R |= 0x80000; // enable irq 19
-	TIMER0_CTL_R |= 0x01; // enable timer
-
-	EnableInterrupts();
-}
 
 void spi_write(uint8_t data)
 {
@@ -39,13 +26,39 @@ void spi_write(uint8_t data)
 	SSI2_DR_R = data;
 }
 
-void Timer0_IntHandler(void)
+void spi_disable_tx_irq(void)
 {
-	static int i = 0;
+	SSI2_IM_R &= ~SSI_IM_TXIM;
+}
 
-	TIMER0_ICR_R = 0x01; // clear timeout interrupt flag
+void spi_enable_tx_irq(void)
+{
+	SSI2_IM_R |= SSI_IM_TXIM;
+}
 
-	spi_write(i++);
+void spi_start_tx(void)
+{
+	char c;
+
+	// tx is already started and in progress
+	if ((SSI2_SR_R & SSI_SR_TFE) == 0)
+		return;
+
+	spi_disable_tx_irq(); // enter critical section
+
+	while ((SSI2_SR_R & SSI_SR_TNF) && !rg_buf_is_empty(&tx_rg_buf)) {
+		rg_buf_get_char(&tx_rg_buf, &c);
+		SSI2_DR_R = c;
+	}
+
+	if (!rg_buf_is_empty(&tx_rg_buf))
+		spi_enable_tx_irq(); // schedule next tx
+}
+
+void SSI2_IntHandler(void)
+{
+	if (SSI2_MIS_R & SSI_MIS_TXMIS)
+		spi_start_tx();
 }
 
 /*
@@ -76,18 +89,32 @@ void spi_init(uint8_t bus_fq_mhz, uint8_t ssi_clk_mhz)
 	SSI2_CPSR_R = bus_fq_mhz / ssi_clk_mhz;
 	SSI2_CR0_R = (SSI2_CR0_R & ~SSI_CR0_FRF_M) | SSI_CR0_DSS_8; // Freescale SPI, 8 bit data width
 
+	// SSI2 interrupt = 57
+	NVIC_PRI14_R = (NVIC_PRI14_R & ~NVIC_PRI14_INTB_M) | 0x8000; // priority 4
+	NVIC_EN1_R |= 0x02000000; // enable interrupt #57
+	spi_disable_tx_irq(); // make sure the irq is disabled
+
 	SSI2_CR1_R = SSI_CR1_SSE; // enable SSI2
 }
 
 int main(void)
 {
+	uint8_t i = 0;
+	struct rg_buf_attr tx_buf_attr = { tx_rg_buf_mem, RG_BUF_SIZE };
+
 	pll_init_80mhz();
 	uart_init();
 	systick_init();
+	leds_init_builtin();
 
-	timer_init(1000000 * 1, 80); // 1s
-
+	rg_buf_init(&tx_rg_buf, &tx_buf_attr);
 	spi_init(MAIN_CLK_FQ_MHZ, SSI_CLK_FQ_MHZ);
 
-	while (true) { }
+	while (true) {
+		for (i = 0; i < RG_BUF_SIZE; i++)
+			rg_buf_put_char(&tx_rg_buf, i);
+
+		spi_start_tx();
+		systick_wait_10ms(1);
+	}
 }
