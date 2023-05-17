@@ -20,6 +20,7 @@ struct rg_buf_attr {
 int rg_buf_init(struct rg_buf *rg_buf, struct rg_buf_attr *attr);
 bool rg_buf_is_full(struct rg_buf *rg_buf);
 bool rg_buf_is_empty(struct rg_buf *rg_buf);
+int rg_buf_space_left(struct rg_buf *rg_buf);
 int rg_buf_put_char(struct rg_buf *rg_buf, char c);
 int rg_buf_get_char(struct rg_buf *rg_buf, char *c);
 
