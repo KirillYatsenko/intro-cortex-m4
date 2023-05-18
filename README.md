@@ -5,6 +5,18 @@ Implementing examples from Jonathan Valvano's books, without a dependency on Kei
 ## Supported Hardware
 Only tm4c123gxl evaluation board is supported
 
+## Implemented baremetal drivers and examples
+- [x] PLL
+- [x] Systick
+- [x] UART
+- [x] I2C
+- [x] SPI
+- [x] Matrix keypad
+- [x] LED blinking
+- [x] AHT20
+- [x] Stopwatch
+- [x] Button interrupt handling
+
 ## Dependencies
 Install flasher: ``sudo apt install lm4flash``
 
