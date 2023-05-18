@@ -31,9 +31,7 @@ int rg_buf_space_left(struct rg_buf *rg_buf)
 {
 	// Possible race condition, if rg_buf->top get's increased right after
 	// it read from the memory, the amount of space left will be more then
-	// actual is. Mutex is used in such scenarios, but we don't have it here.
-	//
-	// ToDo: Check enter critical assembly snippet by prof. Valvano
+	// actual is. Another thread should interrupt this function.
 	return rg_buf->size - (rg_buf->top - rg_buf->tail);
 }
 

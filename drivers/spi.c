@@ -93,8 +93,12 @@ int spi_write(uint8_t data[], unsigned size)
 {
 	unsigned i = 0;
 
+	spi_disable_tx_irq();
+
 	if (size > rg_buf_space_left(&tx_rg_buf))
 		return -1;
+
+	spi_enable_tx_irq();
 
 	for (i = 0; i < size; i++)
 		rg_buf_put_char(&tx_rg_buf, data[i]);
