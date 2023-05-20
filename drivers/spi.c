@@ -107,3 +107,14 @@ int spi_write(uint8_t data[], unsigned size)
 
 	return 0;
 }
+
+int spi_write_wait(uint8_t data[], unsigned size)
+{
+	if (spi_write(data, size))
+		return -1;
+
+	// wait while SPI2 is busy
+	while (SSI2_SR_R & SSI_SR_BSY);
+
+	return 0;
+}

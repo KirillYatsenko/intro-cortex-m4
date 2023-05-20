@@ -13,5 +13,6 @@
  */
 void spi_init(uint8_t bus_fq_mhz, uint8_t ssi_clk_mhz);
 int spi_write(uint8_t data[], unsigned size);
+int spi_write_wait(uint8_t data[], unsigned size);
 
 #endif
