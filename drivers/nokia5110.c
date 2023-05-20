@@ -13,6 +13,9 @@
 #define MAIN_CLK_FQ_MHZ		80
 #define SSI_CLK_FQ_MHZ		4
 
+static uint8_t ROW;	// 48/8 = 6 rows
+static uint8_t COLUMN;  // 84/5 = 16 cols
+
 // configure RST and D/C pins
 static void init_control_pins()
 {
@@ -55,23 +58,42 @@ static void write_data(uint8_t data[], unsigned size)
 	spi_write_wait(data, size);
 }
 
-static void clear_display(void)
+void nokia5110_clear_display(void)
 {
 	uint8_t empty[] = {0x00};
+
+	nokia5110_set_row(0);
+	nokia5110_set_col(0);
+
 	for (unsigned i = 0; i < 504; i++) {
 		write_data(empty, sizeof(empty));
 	}
 }
 
-static uint8_t h_char[] = {0x1F, 0x04, 0x1F, 0x00};
-static uint8_t e_char[] = {0x1F, 0x15, 0x15, 0x00};
-static uint8_t l_char[] = {0x1F, 0x10, 0x10, 0x00};
-static uint8_t o_char[] = {0x1F, 0x11, 0x1F, 0x00};
-static uint8_t space_char[] = {0x00, 0x00};
-static uint8_t w_char[] = {0x0F, 0x10, 0x0E, 0x10, 0x0F, 0x00};
-static uint8_t r_char[] = {0x1F, 0x09, 0x16, 0x00};
-static uint8_t d_char[] = {0x1F, 0x11, 0x11, 0x0E, 0x00};
-static uint8_t exclam_char[] = {0x17, 0x00};
+void nokia5110_clear_row(uint8_t row)
+{
+	uint8_t empty[] = {0x00};
+
+	if (row >= 6)
+		return;
+
+	nokia5110_set_row(row);
+
+	for (unsigned i = 0; i < 84; i++) {
+		write_data(empty, sizeof(empty));
+	}
+
+	nokia5110_set_row(row);
+	nokia5110_set_col(0); // get back to the start of the row
+}
+
+void nokia5110_write_raw_sym(uint8_t *raw)
+{
+	if (!raw)
+		return;
+
+	write_data(raw, SYM_SIZE);
+}
 
 void nokia5110_write_str(char *str)
 {
@@ -80,44 +102,53 @@ void nokia5110_write_str(char *str)
 	if (!str)
 		return;
 
-	for (i = 0; str[i] != '\0'; i++) {
-		if (str[i] == 'H' || str[i] == 'h')
-			write_data(h_char, sizeof(h_char));
-		else if (str[i] == 'E' || str[i] == 'e')
-			write_data(e_char, sizeof(e_char));
-		else if (str[i] == 'L' || str[i] == 'l')
-			write_data(l_char, sizeof(l_char));
-		else if (str[i] == 'O' || str[i] == 'o')
-			write_data(o_char, sizeof(o_char));
-		else if (str[i] == ' ')
-			write_data(space_char, sizeof(space_char));
-		else if (str[i] == 'W' || str[i] == 'w')
-			write_data(w_char, sizeof(w_char));
-		else if (str[i] == 'R' || str[i] == 'r')
-			write_data(r_char, sizeof(r_char));
-		else if (str[i] == 'D' || str[i] == 'd')
-			write_data(d_char, sizeof(d_char));
-		else if (str[i] == '!')
-			write_data(exclam_char, sizeof(exclam_char));
-	}
+	for (i = 0; str[i] != '\0'; i++)
+		write_data((uint8_t *)(ASCII[str[i] - ASCII_OFFSET]), SYM_SIZE);
+}
+
+void nokia5110_set_row(uint8_t row)
+{
+	uint8_t cmd_set_row[] = {0x40};
+
+	if (row >= 6)
+		return;
+
+	ROW = row;
+	cmd_set_row[0] |= row;
+
+	write_cmd(cmd_set_row, 1);
+}
+
+void nokia5110_set_col(uint8_t col)
+{
+	uint8_t cmd_set_col[] = {0x80};
+
+	if (col >= 16)
+		return;
+
+	COLUMN = col;
+	cmd_set_col[0] |= col * SYM_SIZE;
+
+	write_cmd(cmd_set_col, 1);
 }
 
 void nokia5110_init(void)
 {
+	uint8_t cmd_init[] = {0x21, 0x90, 0x20, 0x0C, 0x40, 0x80 };
+	uint8_t cmd_setup_cursor[] = {0x04, 0x1F};
+
 	pll_init_80mhz();
 	systick_init();
 	spi_init(MAIN_CLK_FQ_MHZ, SSI_CLK_FQ_MHZ);
 
 	init_control_pins();
 
-	uint8_t cmd_init[] = {0x21, 0x90, 0x20, 0x0C, 0x40, 0x80 };
-	uint8_t cmd_set_start[] = {0x04, 0x1F};
-
 	systick_wait_10ms(10);
 	do_reset();
 	systick_wait_10ms(10);
 
 	write_cmd(cmd_init, sizeof(cmd_init));
-	write_cmd(cmd_set_start, sizeof(cmd_set_start));
-	clear_display();
+	write_cmd(cmd_setup_cursor, sizeof(cmd_setup_cursor));
+
+	nokia5110_clear_display();
 }
