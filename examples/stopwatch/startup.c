@@ -43,6 +43,7 @@ static void IntDefaultHandler(void);
 //*****************************************************************************
 extern void UART0_IntHandler(void);
 extern void Timer0_IntHandler(void);
+extern void SSI2_IntHandler(void);
 
 //*****************************************************************************
 //
@@ -141,7 +142,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // GPIO Port J
     IntDefaultHandler,                      // GPIO Port K
     IntDefaultHandler,                      // GPIO Port L
-    IntDefaultHandler,                      // SSI2 Rx and Tx
+    SSI2_IntHandler,                        // SSI2 Rx and Tx
     IntDefaultHandler,                      // SSI3 Rx and Tx
     IntDefaultHandler,                      // UART3 Rx and Tx
     IntDefaultHandler,                      // UART4 Rx and Tx
