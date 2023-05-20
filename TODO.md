@@ -5,7 +5,7 @@
 - Improve UART driver using interrupts instead of polling, add FIFO buffering - DONE
 - Implement printf functionality for debugging purposes - DONE
 - Matrix keyboard driver - DONE
-- SPI nokia 5110 lcd driver
+- SPI nokia 5110 lcd driver - DONE
 - Move startup.c and scatter.ld to root directory
 - Move common driver code to common src folder
 - Implement Calculator using Matrix keyboard and 5110 nokia display

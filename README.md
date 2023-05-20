@@ -16,6 +16,7 @@ Only tm4c123gxl evaluation board is supported
 - [x] AHT20
 - [x] Stopwatch
 - [x] Button interrupt handling
+- [x] Nokia5110
 
 ## Dependencies
 Install flasher: ``sudo apt install lm4flash``
