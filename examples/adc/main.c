@@ -38,22 +38,26 @@ void adc_init(void)
 	ADC0_EMUX_R = ADC_EMUX_EM3_PROCESSOR; // software trigger
 	ADC0_SSMUX3_R = ~ADC_SSMUX0_MUX0_M; // select AIN0 as ADC sourc
 
-	// end the sequence before starting again, enable irq
+	// end the sequence before starting again, enable irq status
 	ADC0_SSCTL3_R |= ADC_SSCTL3_END0 | ADC_SSCTL3_IE0;
 
-	ADC0_IM_R &= ~ADC_IM_MASK3; // disable interrupt for SS3
+	NVIC_PRI4_R = (NVIC_PRI4_R & ~NVIC_PRI4_INT17_M) | 0x8000; // irq priority 4
+	NVIC_EN0_R = 0x20000; // enable IRQ7 for ADC0 SS3
+	ADC0_ISC_R |= ADC_ISC_IN3; // clear interrupt first
+	ADC0_IM_R |= ADC_IM_MASK3; // enable interrupt for SS3
+
 	ADC0_ACTSS_R |= ADC_ACTSS_ASEN3; // enable sequencer 3
+}
+
+void ADC0_SS3_IntHandler(void)
+{
+	rg_buf_put_data(&rg_buf, ADC0_SSFIFO3_R);
+	ADC0_ISC_R |= ADC_ISC_IN3; // clear interrupt
 }
 
 void start_adc_read(void)
 {
 	ADC0_PSSI_R |= ADC_PSSI_SS3; // start sequencer 3
-
-	while ((ADC0_RIS_R &= ADC_RIS_INR3) == 0) {};
-
-	ADC0_ISC_R |= ADC_ISC_IN3; // clear interrupt
-
-	rg_buf_put_data(&rg_buf, ADC0_SSFIFO3_R);
 }
 
 int main(void)
@@ -69,17 +73,17 @@ int main(void)
 	uart_init();
 
 	while (true) {
-		nokia5110_clear_row(2);
-		nokia5110_set_col(6);
-
 		start_adc_read();
-		rg_buf_get_data(&rg_buf, &adc_val);
+
+		// wait for available data
+		while (rg_buf_get_data(&rg_buf, &adc_val));
 
 		converted = adc_val * conversion;
 
+		nokia5110_clear_row(2);
+		nokia5110_set_col(6);
 		fctprintf(nokia5110_put_char, NULL, "%.2f V", converted);
-		printf("%.2f V\n", converted);
 
-		systick_wait_10ms(10); // wait 500ms
+		printf("%.2f V\n", converted);
 	}
 }
