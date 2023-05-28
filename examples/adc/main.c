@@ -8,10 +8,19 @@
 #include "spi.h"
 #include "printf.h"
 #include "uart.h"
+#include "ring_buffer.h"
+
+#define RG_BUF_SIZE	16
+
+static struct rg_buf rg_buf;
+static buf_t tx_rg_buf_mem[RG_BUF_SIZE];
 
 // PE3 is used as ADC0 input
 void adc_init(void)
 {
+	struct rg_buf_attr tx_buf_attr = { tx_rg_buf_mem, RG_BUF_SIZE };
+	rg_buf_init(&rg_buf, &tx_buf_attr);
+
 	// configure GPIO PORTE first
 	SYSCTL_RCGCADC_R |= SYSCTL_RCGCADC_R0; // enable clock for ADC0
 	while ((SYSCTL_RCGCADC_R & SYSCTL_RCGCADC_R0) == 0);
@@ -28,7 +37,7 @@ void adc_init(void)
 	ADC0_ACTSS_R &= ~ADC_ACTSS_ASEN3; // disable sequencer 3 before programming
 	ADC0_EMUX_R = ADC_EMUX_EM3_PROCESSOR; // software trigger
 	ADC0_SSMUX3_R = ~ADC_SSMUX0_MUX0_M; // select AIN0 as ADC sourc
-					    //
+
 	// end the sequence before starting again, enable irq
 	ADC0_SSCTL3_R |= ADC_SSCTL3_END0 | ADC_SSCTL3_IE0;
 
@@ -36,7 +45,7 @@ void adc_init(void)
 	ADC0_ACTSS_R |= ADC_ACTSS_ASEN3; // enable sequencer 3
 }
 
-uint32_t adc_read(void)
+void start_adc_read(void)
 {
 	ADC0_PSSI_R |= ADC_PSSI_SS3; // start sequencer 3
 
@@ -44,11 +53,13 @@ uint32_t adc_read(void)
 
 	ADC0_ISC_R |= ADC_ISC_IN3; // clear interrupt
 
-	return ADC0_SSFIFO3_R;
+	rg_buf_put_data(&rg_buf, ADC0_SSFIFO3_R);
 }
 
 int main(void)
 {
+	buf_t adc_val;
+	float converted;
 	float conversion = 3.3 / 4096;
 
 	pll_init_80mhz();
@@ -61,10 +72,13 @@ int main(void)
 		nokia5110_clear_row(2);
 		nokia5110_set_col(6);
 
-		fctprintf(nokia5110_put_char, NULL, "%.2f V",
-			  adc_read() * conversion);
+		start_adc_read();
+		rg_buf_get_data(&rg_buf, &adc_val);
 
-		printf("%.2f V\n", adc_read() * conversion);
+		converted = adc_val * conversion;
+
+		fctprintf(nokia5110_put_char, NULL, "%.2f V", converted);
+		printf("%.2f V\n", converted);
 
 		systick_wait_10ms(10); // wait 500ms
 	}
