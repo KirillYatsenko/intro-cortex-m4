@@ -11,7 +11,7 @@
 #define RG_BUF_SIZE	128
 
 static struct rg_buf tx_rg_buf;
-static char tx_rg_buf_mem[RG_BUF_SIZE];
+static buf_t tx_rg_buf_mem[RG_BUF_SIZE];
 
 extern void EnableInterrupts(void);
 
@@ -27,7 +27,7 @@ static void spi_enable_tx_irq(void)
 
 static void spi_start_tx(void)
 {
-	char c;
+	buf_t data;
 
 	// tx is already started and in progress
 	if ((SSI2_SR_R & SSI_SR_TFE) == 0)
@@ -36,8 +36,8 @@ static void spi_start_tx(void)
 	spi_disable_tx_irq(); // enter critical section
 
 	while ((SSI2_SR_R & SSI_SR_TNF) && !rg_buf_is_empty(&tx_rg_buf)) {
-		rg_buf_get_char(&tx_rg_buf, &c);
-		SSI2_DR_R = c;
+		rg_buf_get_data(&tx_rg_buf, &data);
+		SSI2_DR_R = data;
 	}
 
 	if (!rg_buf_is_empty(&tx_rg_buf))
@@ -101,7 +101,7 @@ int spi_write(uint8_t data[], unsigned size)
 	spi_enable_tx_irq();
 
 	for (i = 0; i < size; i++)
-		rg_buf_put_char(&tx_rg_buf, data[i]);
+		rg_buf_put_data(&tx_rg_buf, data[i]);
 
 	spi_start_tx();
 

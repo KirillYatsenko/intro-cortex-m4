@@ -31,7 +31,7 @@ extern void EnableInterrupts(void);
 static char *matrix;
 
 static struct rg_buf rg_buf;
-static char rg_buf_mem[BUF_SIZE];
+static buf_t rg_buf_mem[BUF_SIZE];
 
 static void clocks_init(void)
 {
@@ -173,7 +173,7 @@ static void scan_keypad(void)
 			if (!scan_col(col))
 				continue;
 
-			rg_buf_put_char(&rg_buf, matrix[row * COLS + col]);
+			rg_buf_put_data(&rg_buf, matrix[row * COLS + col]);
 		}
 
 		disable_row(row);
@@ -214,5 +214,11 @@ int matrix_keypad_init(char *str)
 
 int matrix_keypad_read(char *c)
 {
-	return rg_buf_get_char(&rg_buf, c);
+	buf_t data;
+	if (rg_buf_get_data(&rg_buf, &data))
+		return -1;
+
+	*c = (char)data;
+
+	return 0;
 }

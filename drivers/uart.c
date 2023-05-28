@@ -16,8 +16,8 @@
 
 static struct rg_buf rx_rg_buf;
 static struct rg_buf tx_rg_buf;
-static char rx_rg_buf_mem[BUF_SIZE];
-static char tx_rg_buf_mem[BUF_SIZE];
+static buf_t rx_rg_buf_mem[BUF_SIZE];
+static buf_t tx_rg_buf_mem[BUF_SIZE];
 
 static void uart_enable_rx_irq(void)
 {
@@ -76,12 +76,12 @@ void uart_init(void)
 
 static void start_tx()
 {
-	char c;
+	buf_t data;
 
 	// fill the hw buffer, if the hw buffer is not full and there is pending
 	// data in the sw ring buffer
-	while (!(UART0_FR_R & UART_FR_TXFF) && !rg_buf_get_char(&tx_rg_buf, &c))
-		UART0_DR_R = c;
+	while (!(UART0_FR_R & UART_FR_TXFF) && !rg_buf_get_data(&tx_rg_buf, &data))
+		UART0_DR_R = data;
 }
 
 void UART0_IntHandler(void)
@@ -92,7 +92,7 @@ void UART0_IntHandler(void)
 
 		// read until the RX FIFO is empty
 		while (!(UART0_FR_R & UART_FR_RXFE)) {
-			if (rg_buf_put_char(&rx_rg_buf, UART0_DR_R))
+			if (rg_buf_put_data(&rx_rg_buf, UART0_DR_R))
 				break;
 		}
 	} else if (UART0_MIS_R & UART_MIS_TXMIS) {  // Tx interrupt
@@ -111,7 +111,7 @@ void _putchar(char c)
 	uart_disable_tx_irq();
 
 	tx_running = !rg_buf_is_empty(&tx_rg_buf);
-	rg_buf_put_char(&tx_rg_buf, c);
+	rg_buf_put_data(&tx_rg_buf, c);
 
 	if (!tx_running)
 		start_tx();
@@ -124,5 +124,10 @@ void _putchar(char c)
 
 int uart_get_char(char *c)
 {
-	return rg_buf_get_char(&rx_rg_buf, c);
+	buf_t data;
+
+	if (rg_buf_get_data(&rx_rg_buf, &data))
+		return -1;
+
+	return (char)data;
 }

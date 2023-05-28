@@ -1,4 +1,4 @@
-// Source: http://www.simplyembedded.org_buf/tutorials/interrupt-free-ring-buffer/
+// Source: http://www.simplyembedded.org/tutorials/interrupt-free-ring-buffer/
 
 #include "ring_buffer.h"
 
@@ -31,11 +31,11 @@ int rg_buf_space_left(struct rg_buf *rg_buf)
 {
 	// Possible race condition, if rg_buf->top get's increased right after
 	// it read from the memory, the amount of space left will be more then
-	// actual is. Another thread should interrupt this function.
+	// actual is. Another thread should not interrupt this function.
 	return rg_buf->size - (rg_buf->top - rg_buf->tail);
 }
 
-int rg_buf_put_char(struct rg_buf *rg_buf, char c)
+int rg_buf_put_data(struct rg_buf *rg_buf, buf_t d)
 {
 	size_t indx;
 
@@ -44,7 +44,7 @@ int rg_buf_put_char(struct rg_buf *rg_buf, char c)
 		return -1;
 
 	indx = rg_buf->top & (rg_buf->size - 1);
-	rg_buf->buf[indx] = c;
+	rg_buf->buf[indx] = d;
 	rg_buf->top++;
 
 	return 0;
@@ -55,7 +55,7 @@ bool rg_buf_is_empty(struct rg_buf *rg_buf)
 	return rg_buf->top == rg_buf->tail;
 }
 
-int rg_buf_get_char(struct rg_buf *rg_buf, char *c)
+int rg_buf_get_data(struct rg_buf *rg_buf, buf_t *d)
 {
 	size_t indx;
 
@@ -64,7 +64,7 @@ int rg_buf_get_char(struct rg_buf *rg_buf, char *c)
 		return -1;
 
 	indx = rg_buf->tail & (rg_buf->size - 1);
-	*c = rg_buf->buf[indx];
+	*d = rg_buf->buf[indx];
 	rg_buf->tail++;
 
 	return 0;
