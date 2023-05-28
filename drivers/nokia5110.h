@@ -19,6 +19,9 @@ void nokia5110_init(void);
 void nokia5110_clear_display(void);
 void nokia5110_clear_row(uint8_t row);
 
+// arg is ignored
+void nokia5110_put_char(char c, void *arg);
+
 // expects null terminated string
 void nokia5110_write_str(char *str);
 void nokia5110_write_raw_sym(uint8_t *raw);

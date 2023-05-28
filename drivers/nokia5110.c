@@ -95,6 +95,11 @@ void nokia5110_write_raw_sym(uint8_t *raw)
 	write_data(raw, SYM_SIZE);
 }
 
+void nokia5110_put_char(char c, void *arg)
+{
+	write_data((uint8_t *)(ASCII[c - ASCII_OFFSET]), SYM_SIZE);
+}
+
 void nokia5110_write_str(char *str)
 {
 	unsigned i;
@@ -103,7 +108,7 @@ void nokia5110_write_str(char *str)
 		return;
 
 	for (i = 0; str[i] != '\0'; i++)
-		write_data((uint8_t *)(ASCII[str[i] - ASCII_OFFSET]), SYM_SIZE);
+		nokia5110_put_char(str[i], NULL);
 }
 
 void nokia5110_set_row(uint8_t row)
