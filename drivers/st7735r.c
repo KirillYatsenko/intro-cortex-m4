@@ -20,8 +20,8 @@
 #define CMD_READID		0x09 // read display id
 #define CMD_FRMCTRL		0xB1 // frame rate control
 
-#define MAX_WIDTH		160
-#define MAX_HEIGHT		128
+#define MAX_WIDTH		128
+#define MAX_HEIGHT		160
 
 static uint8_t selected_color[2];
 
@@ -151,7 +151,6 @@ static void init_display(void)
 	write_cmd(CMD_SWRST, 0, 0, 150); // software reset
 	write_cmd(CMD_SLPOUT, 0, 0, 500); // sleep-out mode
 	write_cmd(CMD_COLMOD, colmod_data, sizeof(colmod_data), 10);
-	write_cmd(CMD_MADCTL, madctl_data, sizeof(madctl_data), 0); // rotate screen
 	write_cmd(CMD_DISPON, 0, 0, 200); // display on
 }
 
