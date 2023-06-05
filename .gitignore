@@ -6,3 +6,4 @@
 *.lst
 .cache/
 compile_commands.json
+bmpconvert
