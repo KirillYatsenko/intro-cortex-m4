@@ -22,7 +22,6 @@
 
 struct game_arena {
 	uint16_t bitmap[SCREEN_MAX_CELLS_Y][SCREEN_MAX_CELLS_X];
-
 };
 
 struct piece {
@@ -40,7 +39,7 @@ enum new_position {
 };
 
 static struct game_arena arena;
-static enum new_position new_position;
+static enum new_position new_pos;
 
 static void clear_display(void)
 {
@@ -83,53 +82,53 @@ void GpioPortCHandler(void)
 	if (GPIO_PORTC_MIS_R & 0x40) {
 		// left pressed
 		GPIO_PORTC_ICR_R = 0x40;
-		new_position = POS_LEFT;
+		new_pos = POS_LEFT;
 	} else if (GPIO_PORTC_MIS_R & 0x20) {
 		// center pressed
 		GPIO_PORTC_ICR_R = 0x20;
 	} else if (GPIO_PORTC_MIS_R & 0x10) {
 		// right pressed
 		GPIO_PORTC_ICR_R = 0x10;
-		new_position = POS_RIGHT;
+		new_pos = POS_RIGHT;
 	}
 
 	GPIO_PORTC_ICR_R = 0x70; // clear interrupt
 }
 
-static void set_piece_location(struct piece *piece)
+static void set_piece_location(struct piece *p)
 {
-	piece->x_pos = SCREEN_MAX_CELLS_X / 2;
+	p->x_pos = SCREEN_MAX_CELLS_X / 2;
 }
 
-static void generate_piece(struct piece *piece)
+static void generate_piece(struct piece *p)
 {
-	static int tetromino_t = 0;
-	tetromino_t = tetromino_t % COUNT_TETR;
+	static int tetr_t = 0;
+	tetr_t = tetr_t % COUNT_TETR;
 
-	piece->y_pos = 0;
-	piece->y_trimmed = 0;
-	piece->displayed = true;
-	tetromino_clone(&tetrominos[tetromino_t], &piece->tetromino);
+	p->y_pos = 0;
+	p->y_trimmed = 0;
+	p->displayed = true;
+	tetromino_clone(&tetrominos[tetr_t], &p->tetromino);
 
-	set_piece_location(piece);
+	set_piece_location(p);
 
-	tetromino_t++;
+	tetr_t++;
 }
 
-static void draw_piece_bit(bool erase, struct piece *piece, uint16_t row,
+static void draw_piece_bit(bool erase, struct piece *p, uint16_t row,
 						   uint16_t col)
 {
 	int16_t x1, x2, y1, y2;
-	uint16_t color = erase ? BACKGROUD_COLOR : piece->tetromino.color;
+	uint16_t color = erase ? BACKGROUD_COLOR : p->tetromino.color;
 
-	y1 = (piece->y_pos - TETROMINO_HEIGHT + row) * CELL_SIZE;
+	y1 = (p->y_pos - TETROMINO_HEIGHT + row) * CELL_SIZE;
 	y2 = y1 + CELL_SIZE;
 
 	// ignore non-visible bit
 	if (y1 < 0)
 		return;
 
-	x1 = (piece->x_pos + col) * CELL_SIZE;
+	x1 = (p->x_pos + col) * CELL_SIZE;
 	x2 = x1 + CELL_SIZE;
 
 	st7735r_set_color(color);
@@ -139,17 +138,17 @@ static void draw_piece_bit(bool erase, struct piece *piece, uint16_t row,
 	st7735r_draw_rectangle(false, x1, x2, y1, y2);
 }
 
-static void draw_piece(struct piece *piece, bool erase)
+static void draw_piece(struct piece *p, bool erase)
 {
 	uint16_t row, col;
 
 	// iterate over tetromino bitmap and draw respected bits
 	for (row = 0; row < TETROMINO_HEIGHT; row++) {
 		for (col = 0; col < TETROMINO_WIDHT; col++) {
-			if (!piece->tetromino.bitmap[row][col])
+			if (!p->tetromino.bitmap[row][col])
 				continue;
 
-			draw_piece_bit(erase, piece, row, col);
+			draw_piece_bit(erase, p, row, col);
 		}
 	}
 }
@@ -172,7 +171,7 @@ static void print_matrix(bool matrix[4][4])
 
 // merge piece into existing arena,
 // return error if unable to merge = GAME LOST
-static int merge_piece(struct piece *piece)
+static int merge_piece(struct piece *p)
 {
 	uint8_t row, col;
 	int16_t arena_y, arena_x;
@@ -181,40 +180,75 @@ static int merge_piece(struct piece *piece)
 
 	for (row = 0; row < TETROMINO_HEIGHT; row++) {
 		for (col = 0; col < TETROMINO_WIDHT; col++) {
-			if (!piece->tetromino.bitmap[row][col])
+			if (!p->tetromino.bitmap[row][col])
 				continue;
 
-			arena_y = piece->y_pos - TETROMINO_HEIGHT + row;
-			arena_x = piece->x_pos + col;
+			arena_y = p->y_pos - TETROMINO_HEIGHT + row;
+			arena_x = p->x_pos + col;
 
 			if (arena_y < 0)
 				return -1;
 
-			arena.bitmap[arena_y][arena_x] = piece->tetromino.color;
+			arena.bitmap[arena_y][arena_x] = p->tetromino.color;
 		}
 	}
 
 	return 0;
 }
 
-// check if collision occured with existing
+// check if vertical collision occured with existing
 // pieces in the arena or the piece is in the very bottom
-static bool detect_collision(struct piece *piece)
+static bool y_collision(struct piece *p)
 {
 	uint8_t col, row;
 	int16_t arena_y, arena_x;
 
-	if (piece->y_pos == SCREEN_MAX_CELLS_Y)
+	if (p->y_pos == SCREEN_MAX_CELLS_Y)
 		return true;
 
 	for (row = 0; row < TETROMINO_HEIGHT; row++) {
 		for (col = 0; col < TETROMINO_WIDHT; col++) {
-			if (!piece->tetromino.bitmap[row][col])
+			if (!p->tetromino.bitmap[row][col])
 				continue;
 
 			// check if the pixel below is occupied
-			arena_y = (piece->y_pos - TETROMINO_HEIGHT + row) + 1;
-			arena_x = piece->x_pos + col;
+			arena_y = (p->y_pos - TETROMINO_HEIGHT + row) + 1;
+			arena_x = p->x_pos + col;
+
+			// piece's bit is not visible yet
+			if (arena_y < 0)
+				continue;
+
+			if (arena.bitmap[arena_y][arena_x])
+				return true;
+		}
+	}
+
+	return false;
+}
+
+// dir == false = left
+// dir == true = right
+static bool x_collision(struct piece *p, enum new_position pos)
+{
+	uint8_t col, row;
+	int16_t arena_y, arena_x;
+
+	if (pos == POS_LEFT && p->x_pos == 0)
+			return true;
+
+	for (row = 0; row < TETROMINO_HEIGHT; row++) {
+		for (col = 0; col < TETROMINO_WIDHT; col++) {
+			if (!p->tetromino.bitmap[row][col])
+				continue;
+
+			if ((p->x_pos + col == SCREEN_MAX_CELLS_X - 1) && pos == POS_RIGHT)
+				return true;
+
+			arena_y = (p->y_pos - TETROMINO_HEIGHT + row);
+
+			arena_x = p->x_pos + col;
+			arena_x += pos == POS_LEFT ? -1 : +1;
 
 			// piece's bit is not visible yet
 			if (arena_y < 0)
@@ -229,24 +263,27 @@ static bool detect_collision(struct piece *piece)
 }
 
 // return non-zero if piece can't be moved
-static int move_piece(struct piece *piece)
+static int move_piece(struct piece *p)
 {
-	if (detect_collision(piece)) {
-		if (merge_piece(piece))
+	if (y_collision(p)) {
+		if (merge_piece(p))
 			return GAME_LOST;
 
 		return PIECE_MERGED;
 	}
 
-	draw_piece(piece, true); // erase piece first
+	draw_piece(p, true); // erase piece first
 
-	piece->y_pos++;
+	p->y_pos++;
 
-	// we can change position only if right-left collision won't appear
+	if (new_pos == POS_LEFT && !x_collision(p, new_pos))
+			p->x_pos--;
+	else if (new_pos == POS_RIGHT && !x_collision(p, new_pos))
+			p->x_pos++;
 
-	new_position = POS_UNCHANGED;
+	new_pos = POS_UNCHANGED;
 
-	draw_piece(piece, false);
+	draw_piece(p, false);
 
 	return 0;
 }
@@ -254,13 +291,13 @@ static int move_piece(struct piece *piece)
 static void start_game(void)
 {
 	int ret;
-	struct piece piece;
+	struct piece p;
 
 	while (true) {
-		generate_piece(&piece);
-		new_position = POS_UNCHANGED;
+		generate_piece(&p);
+		new_pos = POS_UNCHANGED;
 
-		while (!(ret = move_piece(&piece))) {
+		while (!(ret = move_piece(&p))) {
 			// systick irq should be used
 			systick_wait_10ms(50);
 		}
