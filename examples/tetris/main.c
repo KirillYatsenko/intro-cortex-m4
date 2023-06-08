@@ -95,22 +95,16 @@ void GpioPortCHandler(void)
 	GPIO_PORTC_ICR_R = 0x70; // clear interrupt
 }
 
-static void set_piece_location(struct piece *p)
-{
-	p->x_pos = SCREEN_MAX_CELLS_X / 2;
-}
-
 static void generate_piece(struct piece *p)
 {
 	static int tetr_t = 0;
 	tetr_t = tetr_t % COUNT_TETR;
 
 	p->y_pos = 0;
+	p->x_pos = SCREEN_MAX_CELLS_X / 2;
 	p->y_trimmed = 0;
 	p->displayed = true;
 	tetromino_clone(&tetrominos[tetr_t], &p->tetromino);
-
-	set_piece_location(p);
 
 	tetr_t++;
 }
@@ -153,30 +147,12 @@ static void draw_piece(struct piece *p, bool erase)
 	}
 }
 
-static void print_matrix(bool matrix[4][4])
-{
-	printf("\n");
-	for (int row = 0; row < 4; row++) {
-		printf("[ ");
-		for (int col = 0; col < 4; col++) {
-			printf("\t%d", matrix[row][col]);
-			if (col != 3)
-				printf(", ");
-			else
-				printf(" ");
-		}
-		printf("]\n");
-	}
-}
-
 // merge piece into existing arena,
 // return error if unable to merge = GAME LOST
 static int merge_piece(struct piece *p)
 {
 	uint8_t row, col;
 	int16_t arena_y, arena_x;
-
-	// print_matrix(piece->tetromino.bitmap);
 
 	for (row = 0; row < TETROMINO_HEIGHT; row++) {
 		for (col = 0; col < TETROMINO_WIDHT; col++) {
@@ -231,6 +207,8 @@ static bool y_collision(struct piece *p)
 // dir == true = right
 static bool x_collision(struct piece *p, enum new_position pos)
 {
+	// ToDo: merge with the function above(y_collision)!
+
 	uint8_t col, row;
 	int16_t arena_y, arena_x;
 
@@ -277,15 +255,95 @@ static int move_piece(struct piece *p)
 	p->y_pos++;
 
 	if (new_pos == POS_LEFT && !x_collision(p, new_pos))
-			p->x_pos--;
+		p->x_pos--;
 	else if (new_pos == POS_RIGHT && !x_collision(p, new_pos))
-			p->x_pos++;
+		p->x_pos++;
 
 	new_pos = POS_UNCHANGED;
 
 	draw_piece(p, false);
 
 	return 0;
+}
+
+static void redraw_line(uint8_t row)
+{
+	int16_t x1, x2, y1, y2;
+	uint8_t col;
+
+	for (col = 0; col < SCREEN_MAX_CELLS_X; col++) {
+		y1 = row * CELL_SIZE;
+		y2 = y1 + CELL_SIZE;
+
+		x1 = col * CELL_SIZE;
+		x2 = x1 + CELL_SIZE;
+
+		if (arena.bitmap[row][col]) {
+			st7735r_set_color(arena.bitmap[row][col]);
+			st7735r_draw_rectangle(true, x1, x2, y1, y2);
+
+			st7735r_set_color(BACKGROUD_COLOR);
+			st7735r_draw_rectangle(false, x1, x2, y1, y2);
+		} else { // erase branch
+			st7735r_set_color(BACKGROUD_COLOR);
+			st7735r_draw_rectangle(true, x1, x2, y1, y2);
+		}
+	}
+}
+
+static bool filled_line_exists(uint8_t *row)
+{
+	uint8_t col, row_tmp;
+	bool filled_exist = false;
+
+	for (row_tmp = SCREEN_MAX_CELLS_Y - 1; row_tmp > 0; row_tmp--) {
+		for (col = 0; col < SCREEN_MAX_CELLS_X; col++) {
+			if (!arena.bitmap[row_tmp][col])
+				break;
+
+			if (col == SCREEN_MAX_CELLS_X - 1)
+				filled_exist = true;
+		}
+
+		if (filled_exist) {
+			*row = row_tmp;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+// check if combo is achieved and shift the arena if so
+static bool clear_line()
+{
+	uint8_t col, row;
+	bool line_empty;
+
+	if (!filled_line_exists(&row)) {
+		printf("filled line does not exists!\n");
+		return false;
+	}
+
+	printf("filled line exists!\n");
+
+	// shift down the arena, row specifies first filled line
+	for (; row > 0;  row--) {
+		line_empty = true;
+
+		for (col = 0; col < SCREEN_MAX_CELLS_X; col++) {
+			arena.bitmap[row][col] = arena.bitmap[row - 1][col];
+			if (arena.bitmap[row][col])
+				line_empty = false;
+		}
+
+		redraw_line(row);
+
+		if (line_empty)
+			break;
+	}
+
+	return true;
 }
 
 static void start_game(void)
@@ -299,7 +357,7 @@ static void start_game(void)
 
 		while (!(ret = move_piece(&p))) {
 			// systick irq should be used
-			systick_wait_10ms(50);
+			systick_wait_10ms(20);
 		}
 
 		if (ret == GAME_LOST) {
@@ -307,6 +365,8 @@ static void start_game(void)
 			printf("game lost!\n");
 			return;
 		}
+
+		while (clear_line());
 	}
 }
 
