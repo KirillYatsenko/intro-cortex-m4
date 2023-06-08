@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "spi.h"
 #include "pll.h"
@@ -23,7 +24,13 @@
 #define MAX_WIDTH		128
 #define MAX_HEIGHT		160
 
-static uint8_t selected_color[2];
+/*
+ *   Color encoding
+ *  red - green - blue
+ *  5  -   6   -  5
+ *  refer to section: 9.7.21
+ */
+static uint16_t selected_color;
 
 static void set_data_mode()
 {
@@ -34,7 +41,6 @@ static void set_cmd_mode()
 {
 	GPIO_PORTA_DATA_R &= ~0x80; // set PA7(D/C) to low
 }
-
 
 static void write_data(uint8_t data[], unsigned size)
 {
@@ -64,7 +70,8 @@ static void write_data_init(void)
 
 static void write_pixel()
 {
-	write_data(selected_color, sizeof(selected_color));
+	uint8_t color[] = { selected_color >> 8, selected_color };
+	write_data(color, sizeof(color));
 }
 
 static void set_window(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2)
@@ -88,38 +95,25 @@ static void set_window(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2)
 	write_cmd(CMD_RASET, row_data, sizeof(row_data), 0);
 }
 
-/*
- *   Color encoding
- *  red - green - blue
- *  5  -   6   -  5
- *  refer to section: 9.7.21
- */
-void st7735r_set_color(uint16_t red, uint16_t green, uint16_t blue)
-{
-	red = red & 0x1F;
-	green = green & 0x3F;
-	blue = blue & 0x1F;
+// void st7735r_set_color(uint8_t red, uint8_t green, uint8_t blue)
+// {
+// 	red = red & 0x1F;
+// 	green = green & 0x3F;
+// 	blue = blue & 0x1F;
+//
+// 	/*           #1 byte                     #0 byte
+// 	 * [red(5-bits),green(3-bits)] [green(3-bits),blue(5-bits)]
+// 	*/
+// 	selected_color = (red << 11) | (green << 5) | blue;
+// }
 
-	/*           #1 byte                     #0 byte
-	 * [red(5-bits),green(3-bits)] [green(3-bits),blue(5-bits)]
-	*/
-	selected_color[0] = (red << 3) | (green >> 3);
-	selected_color[1] = (green << 5) | blue;
+void st7735r_set_color(uint16_t color)
+{
+	selected_color = color;
 }
 
-void st7735r_clear_display()
-{
-	uint16_t i;
-
-	set_window(0, MAX_WIDTH - 1, 0, MAX_HEIGHT - 1);
-	write_cmd(CMD_RAMWR, 0, 0, 0); // write to ram
-
-	st7735r_set_color(0x1F, 0x3F, 0x1F); // white color
-	for (i = 0; i < MAX_WIDTH * MAX_HEIGHT; i++)
-		write_pixel();
-}
-
-void st7735r_draw_rectangle(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2)
+static void draw_rectangle_filled(uint8_t x1, uint8_t x2, uint8_t y1,
+				  uint8_t y2)
 {
 	uint16_t i;
 	uint16_t pixels_count = (x2 - x1 + 1) * (y2 - y1 + 1);
@@ -129,6 +123,21 @@ void st7735r_draw_rectangle(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2)
 
 	for (i = 0; i < pixels_count; i++)
 		write_pixel();
+}
+
+void st7735r_draw_rectangle(bool filled, uint8_t x1, uint8_t x2, uint8_t y1,
+			    uint8_t y2)
+{
+	if (filled) {
+		draw_rectangle_filled(x1, x2, y1, y2);
+		return;
+	}
+
+	// draw rectangle border only
+	draw_rectangle_filled(x1, x2, y1, y1);
+	draw_rectangle_filled(x2, x2, y1, y2);
+	draw_rectangle_filled(x1, x1, y1, y2);
+	draw_rectangle_filled(x1, x2, y2, y2);
 }
 
 // configure RST and D/C pins

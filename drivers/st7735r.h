@@ -2,6 +2,11 @@
 #define _ST7735R_H_
 
 #include <stdint.h>
+#include <stdbool.h>
+
+#define ST7735R_MAX_HEIGHT	160 - 1
+#define ST7735R_MAX_WIDTH	128 - 1
+#define ST7735R_CENTER		80
 
 /*  Wiring
  * PA7 - D/C
@@ -11,10 +16,8 @@
  * PB7 - MOSI
  */
 void st7735r_init();
-void st7735r_clear_display();
-void st7735r_set_color(uint16_t red, uint16_t green, uint16_t blue);
-void st7735r_draw_rectangle(uint8_t x1, uint8_t x2, uint8_t y1, uint8_t y2);
-void st7735r_draw_bitmap(int16_t x, int16_t y, const uint16_t *image,
-			 int16_t width, int16_t height);
+void st7735r_set_color(uint16_t color);
+void st7735r_draw_rectangle(bool filled, uint8_t x1, uint8_t x2, uint8_t y1,
+			    uint8_t y2);
 
 #endif
