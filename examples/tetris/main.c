@@ -25,10 +25,8 @@ struct game_arena {
 };
 
 struct piece {
-	uint8_t y_pos;
-	uint8_t x_pos;
-	uint8_t y_trimmed;
-	bool displayed;
+	int16_t y_pos;
+	int16_t x_pos;
 	struct tetromino tetromino;
 };
 
@@ -97,6 +95,13 @@ void GpioPortCHandler(void)
 	GPIO_PORTC_ICR_R = 0x70; // clear interrupt
 }
 
+static void clone_piece(struct piece *src, struct piece *dst)
+{
+	dst->y_pos = src->y_pos;
+	dst->x_pos = src->x_pos;
+	tetromino_clone(&src->tetromino, &dst->tetromino);
+}
+
 static void generate_piece(struct piece *p)
 {
 	static int tetr_t = 0;
@@ -104,11 +109,9 @@ static void generate_piece(struct piece *p)
 
 	p->y_pos = 0;
 	p->x_pos = SCREEN_MAX_CELLS_X / 2;
-	p->y_trimmed = 0;
-	p->displayed = true;
 	tetromino_clone(&tetrominos[tetr_t], &p->tetromino);
 
-	tetr_t++;
+	tetr_t++; // randomizer should be used instead
 }
 
 static void draw_piece_bit(bool erase, struct piece *p, uint16_t row,
@@ -174,14 +177,14 @@ static int merge_piece(struct piece *p)
 	return 0;
 }
 
-// check if vertical collision occured with existing
-// pieces in the arena or the piece is in the very bottom
-static bool y_collision(struct piece *p)
+// iterate over existing arena and check if collision occured
+static bool detect_collision(struct piece *p)
 {
 	uint8_t col, row;
 	int16_t arena_y, arena_x;
 
-	if (p->y_pos == SCREEN_MAX_CELLS_Y)
+	// obvious checks
+	if (p->x_pos < 0 || p->y_pos > SCREEN_MAX_CELLS_Y)
 		return true;
 
 	for (row = 0; row < TETROMINO_SIZE; row++) {
@@ -189,13 +192,14 @@ static bool y_collision(struct piece *p)
 			if (!p->tetromino.bitmap[row][col])
 				continue;
 
-			// check if the pixel below is occupied
-			arena_y = (p->y_pos - TETROMINO_SIZE + row) + 1;
+			arena_y = (p->y_pos - TETROMINO_SIZE + row);
 			arena_x = p->x_pos + col;
 
-			// piece's bit is not visible yet
 			if (arena_y < 0)
-				continue;
+				continue; // ignore not visible bit
+
+			if (arena_x >= SCREEN_MAX_CELLS_X)
+				return true;
 
 			if (arena.bitmap[arena_y][arena_x])
 				return true;
@@ -205,47 +209,45 @@ static bool y_collision(struct piece *p)
 	return false;
 }
 
-// dir == false = left
-// dir == true = right
-static bool x_collision(struct piece *p, enum new_position pos)
+static void change_position(struct piece *p)
 {
-	// ToDo: merge with the function above(y_collision)!
+	struct piece p_tmp;
 
-	uint8_t col, row;
-	int16_t arena_y, arena_x;
+	p->y_pos++;
 
-	if (pos == POS_LEFT && p->x_pos == 0)
-			return true;
+	if (new_pos == POS_UNCHANGED)
+		return;
 
-	for (row = 0; row < TETROMINO_SIZE; row++) {
-		for (col = 0; col < TETROMINO_SIZE; col++) {
-			if (!p->tetromino.bitmap[row][col])
-				continue;
+	clone_piece(p, &p_tmp);
 
-			if ((p->x_pos + col == SCREEN_MAX_CELLS_X - 1) && pos == POS_RIGHT)
-				return true;
+	if (new_pos == POS_LEFT)
+		p_tmp.x_pos--;
+	else if (new_pos == POS_RIGHT)
+		p_tmp.x_pos++;
+	else if (new_pos == POS_ROTATE)
+		tetromino_rotate(&p_tmp.tetromino);
 
-			arena_y = (p->y_pos - TETROMINO_SIZE + row);
+	if (!detect_collision(&p_tmp))
+		clone_piece(&p_tmp, p);
 
-			arena_x = p->x_pos + col;
-			arena_x += pos == POS_LEFT ? -1 : +1;
+	new_pos = POS_UNCHANGED;
+}
 
-			// piece's bit is not visible yet
-			if (arena_y < 0)
-				continue;
+static bool detect_possible_collision(struct piece *p)
+{
+	bool ret;
 
-			if (arena.bitmap[arena_y][arena_x])
-				return true;
-		}
-	}
+	p->y_pos++;
+	ret = detect_collision(p);
+	p->y_pos--;
 
-	return false;
+	return ret;
 }
 
 // return non-zero if piece can't be moved
 static int move_piece(struct piece *p)
 {
-	if (y_collision(p)) {
+	if (detect_possible_collision(p)) {
 		if (merge_piece(p))
 			return GAME_LOST;
 
@@ -253,20 +255,7 @@ static int move_piece(struct piece *p)
 	}
 
 	draw_piece(p, true); // erase piece first
-
-	p->y_pos++;
-
-	if (new_pos == POS_LEFT && !x_collision(p, new_pos))
-		p->x_pos--;
-	else if (new_pos == POS_RIGHT && !x_collision(p, new_pos))
-		p->x_pos++;
-	else if (new_pos == POS_ROTATE) {
-		// rotate only if there is no collision
-		tetromino_rotate(&p->tetromino);
-	}
-
-	new_pos = POS_UNCHANGED;
-
+	change_position(p);
 	draw_piece(p, false);
 
 	return 0;

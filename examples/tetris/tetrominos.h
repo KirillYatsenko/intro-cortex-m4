@@ -105,7 +105,7 @@ static void _allign_bottom(struct tetromino *tetr)
 	}
 lines_counted:
 	if (!empty_lines)
-		return;
+		return; // piece is already alligned
 
 	// row now contains first non empty line
 	for (; row >= 0; row--) {
@@ -116,13 +116,11 @@ lines_counted:
 	}
 }
 
-// rotate the tetromino bitmap such way that it's left-bottom alligned
+// rotate the tetromino bitmap such way that it's bottom alligned
 static void tetromino_rotate(struct tetromino *tetr)
 {
 	uint8_t row, col;
 	struct tetromino tetr_tmp;
-
-	printf("tetr type: %d\n", tetr->type);
 
 	if (!tetr)
 		return;
