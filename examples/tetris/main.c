@@ -36,6 +36,7 @@ enum new_position {
 	POS_UNCHANGED,
 	POS_LEFT,
 	POS_RIGHT,
+	POS_ROTATE
 };
 
 static struct game_arena arena;
@@ -85,6 +86,7 @@ void GpioPortCHandler(void)
 		new_pos = POS_LEFT;
 	} else if (GPIO_PORTC_MIS_R & 0x20) {
 		// center pressed
+		new_pos = POS_ROTATE;
 		GPIO_PORTC_ICR_R = 0x20;
 	} else if (GPIO_PORTC_MIS_R & 0x10) {
 		// right pressed
@@ -115,7 +117,7 @@ static void draw_piece_bit(bool erase, struct piece *p, uint16_t row,
 	int16_t x1, x2, y1, y2;
 	uint16_t color = erase ? BACKGROUD_COLOR : p->tetromino.color;
 
-	y1 = (p->y_pos - TETROMINO_HEIGHT + row) * CELL_SIZE;
+	y1 = (p->y_pos - TETROMINO_SIZE + row) * CELL_SIZE;
 	y2 = y1 + CELL_SIZE;
 
 	// ignore non-visible bit
@@ -137,8 +139,8 @@ static void draw_piece(struct piece *p, bool erase)
 	uint16_t row, col;
 
 	// iterate over tetromino bitmap and draw respected bits
-	for (row = 0; row < TETROMINO_HEIGHT; row++) {
-		for (col = 0; col < TETROMINO_WIDHT; col++) {
+	for (row = 0; row < TETROMINO_SIZE; row++) {
+		for (col = 0; col < TETROMINO_SIZE; col++) {
 			if (!p->tetromino.bitmap[row][col])
 				continue;
 
@@ -154,12 +156,12 @@ static int merge_piece(struct piece *p)
 	uint8_t row, col;
 	int16_t arena_y, arena_x;
 
-	for (row = 0; row < TETROMINO_HEIGHT; row++) {
-		for (col = 0; col < TETROMINO_WIDHT; col++) {
+	for (row = 0; row < TETROMINO_SIZE; row++) {
+		for (col = 0; col < TETROMINO_SIZE; col++) {
 			if (!p->tetromino.bitmap[row][col])
 				continue;
 
-			arena_y = p->y_pos - TETROMINO_HEIGHT + row;
+			arena_y = p->y_pos - TETROMINO_SIZE + row;
 			arena_x = p->x_pos + col;
 
 			if (arena_y < 0)
@@ -182,13 +184,13 @@ static bool y_collision(struct piece *p)
 	if (p->y_pos == SCREEN_MAX_CELLS_Y)
 		return true;
 
-	for (row = 0; row < TETROMINO_HEIGHT; row++) {
-		for (col = 0; col < TETROMINO_WIDHT; col++) {
+	for (row = 0; row < TETROMINO_SIZE; row++) {
+		for (col = 0; col < TETROMINO_SIZE; col++) {
 			if (!p->tetromino.bitmap[row][col])
 				continue;
 
 			// check if the pixel below is occupied
-			arena_y = (p->y_pos - TETROMINO_HEIGHT + row) + 1;
+			arena_y = (p->y_pos - TETROMINO_SIZE + row) + 1;
 			arena_x = p->x_pos + col;
 
 			// piece's bit is not visible yet
@@ -215,15 +217,15 @@ static bool x_collision(struct piece *p, enum new_position pos)
 	if (pos == POS_LEFT && p->x_pos == 0)
 			return true;
 
-	for (row = 0; row < TETROMINO_HEIGHT; row++) {
-		for (col = 0; col < TETROMINO_WIDHT; col++) {
+	for (row = 0; row < TETROMINO_SIZE; row++) {
+		for (col = 0; col < TETROMINO_SIZE; col++) {
 			if (!p->tetromino.bitmap[row][col])
 				continue;
 
 			if ((p->x_pos + col == SCREEN_MAX_CELLS_X - 1) && pos == POS_RIGHT)
 				return true;
 
-			arena_y = (p->y_pos - TETROMINO_HEIGHT + row);
+			arena_y = (p->y_pos - TETROMINO_SIZE + row);
 
 			arena_x = p->x_pos + col;
 			arena_x += pos == POS_LEFT ? -1 : +1;
@@ -258,6 +260,10 @@ static int move_piece(struct piece *p)
 		p->x_pos--;
 	else if (new_pos == POS_RIGHT && !x_collision(p, new_pos))
 		p->x_pos++;
+	else if (new_pos == POS_ROTATE) {
+		// rotate only if there is no collision
+		tetromino_rotate(&p->tetromino);
+	}
 
 	new_pos = POS_UNCHANGED;
 
@@ -320,12 +326,8 @@ static bool clear_line()
 	uint8_t col, row;
 	bool line_empty;
 
-	if (!filled_line_exists(&row)) {
-		printf("filled line does not exists!\n");
+	if (!filled_line_exists(&row))
 		return false;
-	}
-
-	printf("filled line exists!\n");
 
 	// shift down the arena, row specifies first filled line
 	for (; row > 0;  row--) {
@@ -357,7 +359,7 @@ static void start_game(void)
 
 		while (!(ret = move_piece(&p))) {
 			// systick irq should be used
-			systick_wait_10ms(20);
+			systick_wait_10ms(50);
 		}
 
 		if (ret == GAME_LOST) {
