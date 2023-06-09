@@ -3,16 +3,16 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <printf.h>
 
 #define TETROMINO_SIZE		4
 
-// R means Rotated
 enum tetromino_t {
 	CUBE_TETR = 0,
 	STRAIGHT_TETR,
 	Z_TETR,
+	Z2_TETR,
 	L_TETR,
+	L2_TETR,
 	T_TETR,
 	COUNT_TETR,
 };
@@ -54,6 +54,16 @@ struct tetromino tetrominos[] = {
 			{ 0, 1, 1, 0 },
 		}
 	},
+	{	// Z2 TETR
+		.color = 0xe1e8,
+		.type = Z2_TETR,
+		.bitmap = {
+			{ 0, 0, 0, 0 },
+			{ 0, 0, 0, 0 },
+			{ 0, 1, 1, 0 },
+			{ 1, 1, 0, 0 },
+		}
+	},
 	{	// L TETR
 		.color = 0x71e7,
 		.type = L_TETR,
@@ -61,6 +71,16 @@ struct tetromino tetrominos[] = {
 			{ 0, 0, 0, 0 },
 			{ 1, 0, 0, 0 },
 			{ 1, 0, 0, 0 },
+			{ 1, 1, 0, 0 },
+		}
+	},
+	{	// L2 TETR
+		.color = 0xba46,
+		.type = L2_TETR,
+		.bitmap = {
+			{ 0, 0, 0, 0 },
+			{ 0, 1, 0, 0 },
+			{ 0, 1, 0, 0 },
 			{ 1, 1, 0, 0 },
 		}
 	},
