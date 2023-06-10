@@ -8,10 +8,12 @@
 #include "uart.h"
 #include "leds.h"
 #include "tm4c123gh6pm.h"
+#include "sprites/score.h"
 
 #define MAX_PIECES				35
 #define CELL_SIZE				12 // in pixels
 #define BACKGROUD_COLOR			0x18a4
+#define FONT_COLOR 				0xFFFF
 
 #define SCREEN_MAX_CELLS_Y		13
 #define SCREEN_MAX_CELLS_X		10
@@ -39,6 +41,7 @@ enum new_position {
 static struct game_arena arena;
 static volatile enum new_position new_pos;
 static unsigned random_seed = 1;
+static unsigned score;
 
 static void clear_display(void)
 {
@@ -334,6 +337,19 @@ static bool filled_line_exists(uint8_t *row)
 	return false;
 }
 
+static void print_score()
+{
+	// draw score label first
+	st7735r_draw_bitmap(5, 10, score_image, score_image_width,
+			score_image_height);
+
+	st7735r_set_color(BACKGROUD_COLOR);
+	st7735r_draw_rectangle(true, 5, 64, 15, 25); // 64 = 8(digits_count) * 8px)
+
+	st7735r_set_color(FONT_COLOR);
+	st7735r_print_number(score, 5, 25);
+}
+
 // check if combo is achieved and shift the arena if so
 static bool clear_line()
 {
@@ -362,6 +378,27 @@ static bool clear_line()
 	return true;
 }
 
+static void clear_lines(void)
+{
+	uint8_t combo = 0;;
+
+	while (clear_line())
+		combo++;
+
+	if (!combo)
+		return;
+	else if (combo == 1)
+		score += 100;
+	else if (combo == 2)
+		score += 300;
+	else if (combo == 3)
+		score += 500;
+	else if (combo == 4)
+		score += 800;
+
+	print_score();
+}
+
 static void start_game(void)
 {
 	int ret;
@@ -369,6 +406,9 @@ static void start_game(void)
 
 	clear_display();
 	clear_arena();
+
+	score = 0;
+	print_score();
 
 	while (true) {
 		generate_piece(&p);
@@ -382,7 +422,7 @@ static void start_game(void)
 		if (ret == GAME_LOST)
 			return;
 
-		while (clear_line());
+		clear_lines();
 	}
 }
 
