@@ -6,7 +6,6 @@
 #include "st7735r.h"
 #include "tetrominos.h"
 #include "uart.h"
-#include "printf.h"
 #include "leds.h"
 #include "tm4c123gh6pm.h"
 
@@ -369,7 +368,6 @@ static void start_game(void)
 
 		if (ret == GAME_LOST) {
 			// clear_display();
-			printf("game lost!\n");
 			return;
 		}
 
