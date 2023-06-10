@@ -39,6 +39,7 @@ enum new_position {
 
 static struct game_arena arena;
 static enum new_position new_pos;
+static unsigned random_seed = 1;
 
 static void clear_display(void)
 {
@@ -102,16 +103,31 @@ static void clone_piece(struct piece *src, struct piece *dst)
 	tetromino_clone(&src->tetromino, &dst->tetromino);
 }
 
+static unsigned get_arena_sum()
+{
+	unsigned sum = 0;
+	uint8_t row, col;
+
+	for (row = 0; row < SCREEN_MAX_CELLS_Y; row++)
+		for (col = 0; col < SCREEN_MAX_CELLS_X; col++)
+			sum += arena.bitmap[row][col] * (row + 1) * (col + 1);
+
+	return sum;
+}
+
+static unsigned get_random()
+{
+	random_seed = (random_seed * 1664525) + 1013904223 + get_arena_sum();
+	return random_seed;
+}
+
 static void generate_piece(struct piece *p)
 {
-	static int tetr_t = 0;
-	tetr_t = tetr_t % COUNT_TETR;
+	unsigned tetr_t = get_random() % COUNT_TETR;
 
 	p->y_pos = 0;
 	p->x_pos = SCREEN_MAX_CELLS_X / 2;
 	tetromino_clone(&tetrominos[tetr_t], &p->tetromino);
-
-	tetr_t++; // randomizer should be used instead
 }
 
 static void draw_piece_bit(bool erase, struct piece *p, uint16_t row,
@@ -348,11 +364,11 @@ static void start_game(void)
 
 		while (!(ret = move_piece(&p))) {
 			// systick irq should be used
-			systick_wait_10ms(50);
+			systick_wait_10ms(45);
 		}
 
 		if (ret == GAME_LOST) {
-			clear_display();
+			// clear_display();
 			printf("game lost!\n");
 			return;
 		}
