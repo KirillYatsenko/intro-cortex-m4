@@ -37,7 +37,7 @@ enum new_position {
 };
 
 static struct game_arena arena;
-static enum new_position new_pos;
+static volatile enum new_position new_pos;
 static unsigned random_seed = 1;
 
 static void clear_display(void)
@@ -112,6 +112,16 @@ static unsigned get_arena_sum()
 			sum += arena.bitmap[row][col] * (row + 1) * (col + 1);
 
 	return sum;
+}
+
+
+static void clear_arena(void)
+{
+	uint8_t row, col;
+
+	for (row = 0; row < SCREEN_MAX_CELLS_Y; row++)
+		for (col = 0; col < SCREEN_MAX_CELLS_X; col++)
+			arena.bitmap[row][col] = 0;
 }
 
 static unsigned get_random()
@@ -357,19 +367,20 @@ static void start_game(void)
 	int ret;
 	struct piece p;
 
+	clear_display();
+	clear_arena();
+
 	while (true) {
 		generate_piece(&p);
 		new_pos = POS_UNCHANGED;
 
 		while (!(ret = move_piece(&p))) {
 			// systick irq should be used
-			systick_wait_10ms(45);
+			systick_wait_10ms(50);
 		}
 
-		if (ret == GAME_LOST) {
-			// clear_display();
+		if (ret == GAME_LOST)
 			return;
-		}
 
 		while (clear_line());
 	}
@@ -386,7 +397,10 @@ int main(void)
 	prepare_display();
 	buttons_init();
 
-	start_game();
+	while (true) {
+		start_game();
 
-	while (true);
+		// wait for any button press to start a new game
+		while (new_pos == POS_UNCHANGED);
+	}
 }
