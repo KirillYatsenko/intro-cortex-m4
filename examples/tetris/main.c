@@ -5,8 +5,6 @@
 #include "systick.h"
 #include "st7735r.h"
 #include "tetrominos.h"
-#include "uart.h"
-#include "leds.h"
 #include "tm4c123gh6pm.h"
 #include "sprites/score.h"
 
@@ -116,7 +114,6 @@ static unsigned get_arena_sum()
 
 	return sum;
 }
-
 
 static void clear_arena(void)
 {
@@ -414,10 +411,8 @@ static void start_game(void)
 		generate_piece(&p);
 		new_pos = POS_UNCHANGED;
 
-		while (!(ret = move_piece(&p))) {
-			// systick irq should be used
+		while (!(ret = move_piece(&p)))
 			systick_wait_10ms(50);
-		}
 
 		if (ret == GAME_LOST)
 			return;
@@ -426,13 +421,9 @@ static void start_game(void)
 	}
 }
 
-// Todo: try to use code from adafruit, maybe refresh rate could be better
-// first do MVP then optimize
 int main(void)
 {
 	pll_init_80mhz();
-	uart_init();
-	leds_init_builtin();
 
 	prepare_display();
 	buttons_init();
