@@ -155,7 +155,6 @@ static void init_control_pins(void)
 static void init_display(void)
 {
 	uint8_t colmod_data[] = { 0x05 }; // color mode: 16-bit
-	uint8_t madctl_data[] = { 0xA0 }; // rotate to left
 
 	write_cmd(CMD_SWRST, 0, 0, 150); // software reset
 	write_cmd(CMD_SLPOUT, 0, 0, 500); // sleep-out mode
