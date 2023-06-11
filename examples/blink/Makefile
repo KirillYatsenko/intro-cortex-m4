@@ -1,7 +1,7 @@
 PART    ?= TM4C123GH6PM
 TARGET  ?= TM4C123_RB1
 CFLAGS  ?= -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=softfp \
-	   -ffunction-sections -fdata-sections -std=c99 -g -Os -Wall -Werror \
+	   -ffunction-sections -fdata-sections -std=c99 -Os -Wall \
 	   -I../../inc -I../../drivers
 
 LDFLAGS ?= --gc-sections
@@ -9,6 +9,8 @@ LDFLAGS ?= --gc-sections
 LIBGCC  := ${shell arm-none-eabi-gcc ${CFLAGS} -print-libgcc-file-name}
 LIBC    := ${shell arm-none-eabi-gcc ${CFLAGS} -print-file-name=libc.a}
 LIBM    := ${shell arm-none-eabi-gcc ${CFLAGS} -print-file-name=libm.a}
+
+SIZE := arm-none-eabi-size
 
 .PHONY: all clean install
 
@@ -21,6 +23,9 @@ all: output.bin output.lst
 
 install: output.bin
 	lm4flash $<
+
+size: output.axf
+	@$(SIZE) $^
 
 clean:
 	rm -f *.d *.o $(DRIVERS_DIR)/*.o $(DRIVERS_DIR)/*.d output.* \

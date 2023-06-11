@@ -12,7 +12,7 @@ static volatile uint32_t systick_irq_counter;
 
 extern void EnableInterrupts(void);
 
-void led_init(void)
+static void led_init(void)
 {
 	SYSCTL_RCGCGPIO_R |= 0x28; // Enable clock to Port F and Port D
 	while ((SYSCTL_RCGCGPIO_R & 0x28) == 0);
@@ -27,13 +27,13 @@ void led_init(void)
 	GPIO_PORTD_DEN_R |= 0x01;
 }
 
-void led_toggle(void)
+static void led_toggle(void)
 {
 	PF2 = PF2 ^ 0x04;
 	PD0 = PD0 ^ 0x01;
 }
 
-void systick_init(uint32_t counter)
+static void systick_init(uint32_t counter)
 {
 	systick_irq_counter = 0;
 
